@@ -2,11 +2,15 @@ package net.typho.compilation_util.lexer
 
 import net.typho.parsing_util.ParsingIterator
 import javax.swing.event.DocumentEvent
+import kotlin.math.max
+import kotlin.math.min
 
 open class JavaLexer {
     companion object {
         @JvmStatic
         fun Char.isJavaPunctuation() = !isWhitespace() && !isLetterOrDigit() && this != '"'
+
+        private fun IntRange.intersects(other: IntRange) = first <= other.last && other.first <= last
     }
 
     @JvmField
@@ -82,65 +86,48 @@ open class JavaLexer {
             DocumentEvent.EventType.REMOVE -> -change.length
             else -> return null
         }
-        val iterator = tokens.listIterator()
 
-        lateinit var firstToken: LexerToken
-        lateinit var lastToken: LexerToken
+        val changeRange = change.offset..(change.offset + change.length + offset)
 
-        var firstTokenIndex = -1
-        var lastTokenIndex = -1
+        val firstTokenIndex = tokens.indexOfFirst { it.range.last >= changeRange.first }
+        val lastTokenIndex = tokens.indexOfLast { it.range.first <= changeRange.last }
 
-        while (iterator.hasNext()) {
-            var index = iterator.nextIndex()
-            var token = iterator.next()
-
-            if (token.range.last >= change.offset) {
-                firstTokenIndex = index
-                firstToken = token
-
-                lastTokenIndex = index
-                lastToken = token
-
-                while (iterator.hasNext()) {
-                    index = iterator.nextIndex()
-                    token = iterator.next()
-
-                    lastTokenIndex = index
-                    lastToken = token
-
-                    if (token.range.first > change.offset + change.length) {
-                        iterator.set(token.copyWithOffset(offset))
-
-                        while (iterator.hasNext()) {
-                            token = iterator.next()
-                            iterator.set(token.copyWithOffset(offset))
-                        }
-
-                        break
-                    }
-                }
-
-                break
-            }
-        }
-
-        if (firstTokenIndex == -1) {
+        if (firstTokenIndex == -1 || lastTokenIndex == -1) {
+            println("Tokens don't care about change")
             return null
         }
 
-        val range = firstToken.range.first..(lastToken.range.last + offset)
-        val sublist = tokens.subList(firstTokenIndex, lastTokenIndex + 1)
-        sublist.clear()
-        process(change.document.getText(range.first, range.last - range.first), sublist)
+        for (i in (lastTokenIndex + 1) until tokens.size) {
+            tokens[i] = tokens[i].copyWithOffset(offset)
+        }
 
-        sublist.replaceAll { it.copyWithOffset(range.first) }
+        val subList = tokens.subList(firstTokenIndex, lastTokenIndex + 1)
+
+        if (subList.isEmpty()) {
+            return null
+        }
+
+        val range = min(subList.first().range.first, changeRange.first)..max(subList.last().range.last + offset.coerceAtLeast(0), changeRange.last + offset.coerceAtLeast(0))
+        val oldList = subList.toList()
+        subList.clear()
+        process(change.document.getText(range.first, range.last - range.first), subList)
+
+        subList.replaceAll { it.copyWithOffset(range.first) }
 
         val shouldBe = mutableListOf<LexerToken>()
         process(change.document.getText(0, change.document.length), shouldBe)
-        println(tokens)
-        println(shouldBe)
 
-        return UpdateResult(range, sublist)
+        println("Update")
+        println("Modification: $changeRange")
+        println("Offset: $offset")
+        println("Start Index: $firstTokenIndex")
+        println("End Index: $lastTokenIndex")
+        println("Old contents: $oldList")
+        println("New contents: $subList")
+        println("Text being processed: '${change.document.getText(range.first, range.last - range.first).replace("\r", "\\r").replace("\n", "\\n")}'")
+        println("Range: $range")
+
+        return UpdateResult(range, subList)
     }
 
     @JvmOverloads
