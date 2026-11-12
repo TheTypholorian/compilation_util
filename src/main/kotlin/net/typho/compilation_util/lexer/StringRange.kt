@@ -1,5 +1,7 @@
 package net.typho.compilation_util.lexer
 
+import net.typho.parsing_util.error.DataReadException
+
 fun String.range(range: IntRange) = StringRange(this, range)
 
 class StringRange(
@@ -35,4 +37,6 @@ class StringRange(
     override fun toString(): String {
         return text.substring(range.first, range.last)
     }
+
+    fun rangeAsLineColumn() = DataReadException.lineAndColumn(text, range.first)
 }

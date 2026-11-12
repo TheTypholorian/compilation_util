@@ -7,7 +7,7 @@ sealed class LexerToken(
     abstract fun copyWithOffset(offset: Int): LexerToken
 
     override fun toString(): String {
-        return "${javaClass.simpleName} at ${this@LexerToken.text.range}: $text"
+        return "${javaClass.simpleName} at ${text.rangeAsLineColumn()}: $text"
     }
 
     class Identifier(
@@ -53,10 +53,13 @@ sealed class LexerToken(
     }
 
     class Keyword(
-        range: StringRange
+        range: StringRange,
+        @JvmField
+        val type: KeywordType
     ) : LexerToken(range) {
         override fun copyWithOffset(offset: Int) = Keyword(
-            text.offset(offset)
+            text.offset(offset),
+            type
         )
     }
 
@@ -69,6 +72,8 @@ sealed class LexerToken(
             text.text,
             index + offset
         )
+        val char: Char
+            get() = text.text[index]
 
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -84,7 +89,7 @@ sealed class LexerToken(
         }
 
         override fun toString(): String {
-            return "${javaClass.simpleName} at $index: $text"
+            return "${javaClass.simpleName} at ${text.rangeAsLineColumn()}: $text"
         }
     }
 
@@ -99,7 +104,7 @@ sealed class LexerToken(
         )
 
         override fun toString(): String {
-            return "${javaClass.simpleName} at ${this@Error.text.range} (text $text): $message"
+            return "${javaClass.simpleName} at ${text.rangeAsLineColumn()} (text $text): $message"
         }
     }
 }

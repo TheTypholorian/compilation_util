@@ -1,6 +1,7 @@
 package net.typho.compilation_util.lexer
 
-import net.typho.parsing_util.ParsingIterator
+import net.typho.compilation_util.parser.JavaParser
+import net.typho.parsing_util.StringParsingIterator
 import javax.swing.event.DocumentEvent
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
@@ -11,69 +12,81 @@ import kotlin.math.min
 open class JavaLexer {
     companion object {
         @JvmStatic
-        fun Char.isJavaPunctuation() = !isWhitespace() && !isLetterOrDigit() && this != '"'
+        fun Char.isJavaPunctuation() = !isWhitespace() && !isLetterOrDigit() && this != '"' && this != '_'
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val input = Path("").absolute().parent.resolve("compilation_util").resolve("tests").resolve("JavaTest.java").readText()
+            val name = "JavaTest.java"
+            val input = Path("").absolute().parent.resolve("compilation_util").resolve("tests").resolve(name).readText()
             val tokens = JavaLexer().process(input)
             tokens.forEach { println(it) }
+
+            println()
+            JavaParser.parse(tokens)
         }
     }
 
     @JvmField
-    val keywords = mutableSetOf(
-        "abstract",
-        "assert",
-        "boolean",
-        "break",
-        "byte",
-        "case",
-        "catch",
-        "char",
-        "class",
-        "const",
-        "continue",
-        "default",
-        "do",
-        "double",
-        "else",
-        "enum",
-        "extends",
-        "final",
-        "finally",
-        "float",
-        "for",
-        "goto",
-        "if",
-        "implements",
-        "import",
-        "instanceof",
-        "int",
-        "interface",
-        "long",
-        "native",
-        "new",
-        "package",
-        "private",
-        "protected",
-        "public",
-        "return",
-        "short",
-        "static",
-        "strictfp",
-        "super",
-        "switch",
-        "synchronized",
-        "this",
-        "throw",
-        "throws",
-        "transient",
-        "try",
-        "void",
-        "volatile",
-        "while",
-    )
+	protected val keywords = mutableMapOf<String, KeywordType>()
+
+    protected fun keywords(vararg keywords: KeywordType) {
+        keywords.forEach { this.keywords.putIfAbsent(it.name, it) }
+    }
+
+    init {
+        keywords(
+            KeywordType.ABSTRACT,
+            KeywordType.ASSERT,
+            KeywordType.BOOLEAN,
+            KeywordType.BREAK,
+            KeywordType.BYTE,
+            KeywordType.CASE,
+            KeywordType.CATCH,
+            KeywordType.CHAR,
+            KeywordType.CLASS,
+            KeywordType.CONST,
+            KeywordType.CONTINUE,
+            KeywordType.DEFAULT,
+            KeywordType.DO,
+            KeywordType.DOUBLE,
+            KeywordType.ELSE,
+            KeywordType.ENUM,
+            KeywordType.EXTENDS,
+            KeywordType.FINAL,
+            KeywordType.FINALLY,
+            KeywordType.FLOAT,
+            KeywordType.FOR,
+            KeywordType.GOTO,
+            KeywordType.IF,
+            KeywordType.IMPLEMENTS,
+            KeywordType.IMPORT,
+            KeywordType.INSTANCEOF,
+            KeywordType.INT,
+            KeywordType.INTERFACE,
+            KeywordType.LONG,
+            KeywordType.NATIVE,
+            KeywordType.NEW,
+            KeywordType.PACKAGE,
+            KeywordType.PRIVATE,
+            KeywordType.PROTECTED,
+            KeywordType.PUBLIC,
+            KeywordType.RETURN,
+            KeywordType.SHORT,
+            KeywordType.STATIC,
+            KeywordType.STRICTFP,
+            KeywordType.SUPER,
+            KeywordType.SWITCH,
+            KeywordType.SYNCHRONIZED,
+            KeywordType.THIS,
+            KeywordType.THROW,
+            KeywordType.THROWS,
+            KeywordType.TRANSIENT,
+            KeywordType.TRY,
+            KeywordType.VOID,
+            KeywordType.VOLATILE,
+            KeywordType.WHILE
+        )
+    }
 
     /**
      * No tokens will ever overlap, but they will not be snug.
@@ -133,7 +146,7 @@ open class JavaLexer {
 
     @JvmOverloads
     fun process(input: String, output: MutableList<LexerToken> = this.tokens.also { it.clear() }): List<LexerToken> {
-        val input = ParsingIterator(input)
+        val input = StringParsingIterator(input)
 
         while (input.hasNext()) {
             input.skipUntil { index, char -> !char.isWhitespace() } ?: break
@@ -192,7 +205,7 @@ open class JavaLexer {
 
             when {
                 word in keywords -> {
-                    output.add(LexerToken.Keyword(input.text.range(wordStart..wordEnd)))
+                    output.add(LexerToken.Keyword(input.text.range(wordStart..wordEnd), keywords[word]!!))
                     fork.merge()
                 }
                 word[0] == '"' || word[0] == '\'' -> {
