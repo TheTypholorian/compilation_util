@@ -1,76 +1,125 @@
 package net.typho.compilation_util
 
 import net.typho.parsing_util.ParsingIterator
+import kotlin.io.path.Path
+import kotlin.io.path.readText
 
 object JavaCompilerPrototype2 {
-    private sealed interface Token
+    private sealed interface Token {
+        val range: IntRange
+
+        fun toString(text: String): String {
+            return text.substring(range.first, range.last)
+        }
+    }
 
     private data class Identifier(
-        @JvmField
-        val text: String
+        override val range: IntRange
     ) : Token
 
     private data class Text(
+        override val range: IntRange,
         @JvmField
-        val text: String,
+        val contentsRange: IntRange,
         @JvmField
         val multiline: Boolean = false
     ) : Token
 
     private data class Number(
-        @JvmField
-        val number: kotlin.Number
+        override val range: IntRange
     ) : Token
 
-    private enum class Keyword : Token {
-        PACKAGE, IMPORT, PUBLIC, CLASS, STATIC, VOID; // TODO
+    private enum class Keyword {
+        ABSTRACT,
+        ASSERT,
+        BOOLEAN,
+        BREAK,
+        BYTE,
+        CASE,
+        CATCH,
+        CHAR,
+        CLASS,
+        CONST,
+        CONTINUE,
+        DEFAULT,
+        DO,
+        DOUBLE,
+        ELSE,
+        ENUM,
+        EXTENDS,
+        FINAL,
+        FINALLY,
+        FLOAT,
+        FOR,
+        GOTO,
+        IF,
+        IMPLEMENTS,
+        IMPORT,
+        INSTANCEOF,
+        INT,
+        INTERFACE,
+        LONG,
+        NATIVE,
+        NEW,
+        PACKAGE,
+        PRIVATE,
+        PROTECTED,
+        PUBLIC,
+        RETURN,
+        SHORT,
+        STATIC,
+        STRICTFP,
+        SUPER,
+        SWITCH,
+        SYNCHRONIZED,
+        THIS,
+        THROW,
+        THROWS,
+        TRANSIENT,
+        TRY,
+        VOID,
+        VOLATILE,
+        WHILE,
     }
 
-    private enum class Special(
+    private data class KeywordToken(
+        override val range: IntRange,
         @JvmField
-        val char: Char
+        val keyword: Keyword
+    ) : Token
+
+    private data class Special(
+        @JvmField
+        val index: Int
     ) : Token {
-        LBRACKET('{'),
-        RBRACKET('}'),
-        LBRACE('['),
-        RBRACE(']'),
-        LPARENTHESES('('),
-        RPARENTHESES(')'),
-        LANGLE('<'),
-        RANGLE('>'),
-        DOT('.'),
-        SEMICOLON(';')
+        override val range: IntRange
+            get() = index..index + 1
     }
+
+    private fun Char.isSpecial() = !isWhitespace() && !isLetterOrDigit() && this != '"'
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val multiline = "\"\"\"This is multiline text\nline 2;\n\nline 4!\n\"this is me trying to break the text\"\"\"\""
-        val original = """
-            package net.typho.compilation_util;
-            
-            import java.lang.System;
-            
-            public class Test {
-            	public static void main(String[] args) {
-                    System.out.println("Hello world");
-                    System.out.println($multiline);
-                    System.out.println(123);
-                }
-            }
-            """
+        val original = Path("tests/JavaTest.java").readText()
         val input = ParsingIterator(original)
         val keywords = Keyword.entries.map { it.name.lowercase() }
-        val special = Special.entries.map { it.char }
-        val quotes = setOf('"', '\'')
         val tokens = mutableListOf<Token>()
 
         main@
         while (input.hasNext()) {
             input.skipUntil { index, char -> !char.isWhitespace() } ?: break
 
-            while (input.peek() in special) {
-                val char = input.next()
-                tokens.add(Special.entries.first { it.char == char })
+            while (input.peek().isSpecial()) { // Slashes are a special character
+                if (input.currentMatches("//")) {
+                    input.skipUntil { index, char -> char == '\n' }
+                    continue@main
+                } else if (input.currentMatches("/*")) {
+                    input.skipUntil { index, char -> input.currentMatches("*/") }
+                    continue@main
+                }
+
+                tokens.add(Special(input.index))
+                input.next()
 
                 if (!input.hasNext()) {
                     break@main
@@ -78,73 +127,76 @@ object JavaCompilerPrototype2 {
             }
 
             val fork = input.fork()
-            val word = fork.takeUntilOrEnd { index, char -> (char.isWhitespace() || char in special) }
+            val wordStart = fork.index
+            val word = fork.takeUntilOrEnd { index, char -> char.isWhitespace() || char.isSpecial() || (char == '/' && (fork.currentMatches("//") || fork.currentMatches("/*"))) }
+            val wordEnd = fork.index
 
             if (word.isBlank()) {
                 continue
             }
 
             if (word in keywords) {
-                tokens.add(Keyword.valueOf(word.uppercase()))
+                tokens.add(KeywordToken(wordStart..wordEnd, Keyword.valueOf(word.uppercase())))
                 fork.merge()
-            } else if (word[0] in quotes) {
+            } else if (word[0] == '"') {
                 val quote = word[0]
 
-                if (quote == '"' && input.currentMatches("\"\"\"")) {
-                    input.next()
-                    input.next()
-                    input.next()
-                    tokens.add(Text(input.takeUntil { index, char -> input.currentMatches("\"\"\"") } ?: TODO(), true))
-                    input.next()
-                    input.next()
-                    input.next()
+                if (input.currentMatches("\"\"\"")) {
+                    val startIndex1 = input.index
+                    input.index += 3
+                    val startIndex2 = input.index
+
+                    var escaped = false
+                    input.skipUntil { index, char ->
+                        if (char == '\\') {
+                            escaped = true
+                            false
+                        } else if (escaped) {
+                            escaped = false
+                            false
+                        } else {
+                            input.currentMatches("\"\"\"")
+                        }
+                    } ?: TODO()
+
+                    val endIndex2 = input.index
+                    input.index += 3
+                    val endIndex1 = input.index
+
+                    tokens.add(Text(startIndex1..endIndex1, startIndex2..endIndex2, true))
                 } else {
-                    input.next()
-                    tokens.add(Text(input.takeUntil { index, char ->
+                    val startIndex1 = input.index++
+                    val startIndex2 = input.index
+
+                    var escaped = false
+                    input.skipUntil { index, char ->
                         if (char == '\n') {
                             TODO("End of line before closing quote $quote")
+                        } else if (char == '\\') {
+                            escaped = true
+                            false
+                        } else if (escaped) {
+                            escaped = false
+                            false
                         } else {
                             char == quote
                         }
-                    } ?: TODO())) // TODO escaping
-                    input.next()
+                    } ?: TODO()
+
+                    val endIndex2 = input.index++
+                    val endIndex1 = input.index
+
+                    tokens.add(Text(startIndex1..endIndex1, startIndex2..endIndex2))
                 }
             } else if (word.all { it.isDigit() }) {
-                tokens.add(Number(word.toInt()))
+                tokens.add(Number(wordStart..wordEnd))
                 fork.merge()
             } else {
-                tokens.add(Identifier(word))
+                tokens.add(Identifier(wordStart..wordEnd))
                 fork.merge()
             }
         }
 
-        tokens.forEach { println(it) }
-
-        val result = buildString {
-            var last: Token? = null
-
-            tokens.forEach { token ->
-                if ((token is Identifier || token is Keyword) && (last is Identifier || last is Keyword)) {
-                    append(' ')
-                }
-
-                when (token) {
-                    is Identifier -> append(token.text)
-                    is Keyword -> append(token.name.lowercase())
-                    is Special -> append(token.char)
-                    is Text -> {
-                        val quotes = if (token.multiline) "\"\"\"" else "\""
-                        append(quotes)
-                        append(token.text)
-                        append(quotes)
-                    }
-                    is Number -> append(token.number)
-                }
-
-                last = token
-            }
-        }
-        println(original)
-        println(result)
+        tokens.forEach { println(it.toString(original)) }
     }
 }
