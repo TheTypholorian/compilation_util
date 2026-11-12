@@ -20,7 +20,7 @@ public class JavaTest<T extends Number & Comparable<T>>
     public static final String TEXT = """
             A multiline text block containing:
                 indentation,
-                escapes: \\n \\t \\" \\\\
+                escapes: \n \t \" \\
                 Unicode: λ Ω 漢字 🚀
             """;
 

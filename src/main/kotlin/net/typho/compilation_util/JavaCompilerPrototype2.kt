@@ -96,7 +96,7 @@ object JavaCompilerPrototype2 {
         val keyword: Keyword
     ) : Token
 
-    data class Special(
+    data class Punctuation(
         @JvmField
         val index: Int
     ) : Token {
@@ -112,11 +112,10 @@ object JavaCompilerPrototype2 {
         val keywords = Keyword.entries.map { it.name.lowercase() }
         val tokens = mutableListOf<Token>()
 
-        main@
         while (input.hasNext()) {
             input.skipUntil { index, char -> !char.isWhitespace() } ?: break
 
-            while (input.peek().isSpecial()) { // Slashes are a special character
+            if (input.peek().isSpecial()) { // Slashes are a special character
                 if (input.currentMatches("//")) {
                     val startIndex1 = input.index
                     input.index += 2
@@ -127,8 +126,6 @@ object JavaCompilerPrototype2 {
                     val endIndex = input.index
 
                     tokens.add(Comment(startIndex1..endIndex, startIndex2..endIndex))
-
-                    continue@main
                 } else if (input.currentMatches("/*")) {
                     val startIndex1 = input.index
                     input.index += 2
@@ -141,16 +138,24 @@ object JavaCompilerPrototype2 {
                     val endIndex1 = input.index
 
                     tokens.add(Comment(startIndex1..endIndex1, startIndex2..endIndex2, true))
-
-                    continue@main
                 }
 
-                tokens.add(Special(input.index))
+                tokens.add(Punctuation(input.index))
                 input.next()
 
-                if (!input.hasNext()) {
-                    break@main
+                continue
+            }
+
+            if (input.peek().isDigit()) {
+                val startIndex = input.index
+                input.skipUntilOrEnd { index, char ->
+                    val char = char.lowercaseChar() // grab everything that might be a number and deal with it later
+                    !(char.isDigit() || char == 'x' || char == 'p' || char == 'L' || char == '.' || char == '-' || char == '+' || char == '_' || char in 'a'..'f')
                 }
+                val endIndex = input.index
+                tokens.add(Number(startIndex..endIndex))
+
+                continue
             }
 
             val fork = input.fork()
@@ -215,9 +220,6 @@ object JavaCompilerPrototype2 {
 
                     tokens.add(Text(startIndex1..endIndex1, startIndex2..endIndex2))
                 }
-            } else if (word.all { it.isDigit() }) {
-                tokens.add(Number(wordStart..wordEnd))
-                fork.merge()
             } else {
                 tokens.add(Identifier(wordStart..wordEnd))
                 fork.merge()
