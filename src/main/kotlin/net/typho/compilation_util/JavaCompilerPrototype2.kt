@@ -128,7 +128,7 @@ object JavaCompilerPrototype2 {
 
             val fork = input.fork()
             val wordStart = fork.index
-            val word = fork.takeUntilOrEnd { index, char -> char.isWhitespace() || char.isSpecial() || (char == '/' && (fork.currentMatches("//") || fork.currentMatches("/*"))) }
+            val word = fork.takeUntilOrEnd { index, char -> char.isWhitespace() || char.isSpecial() }
             val wordEnd = fork.index
 
             if (word.isBlank()) {
