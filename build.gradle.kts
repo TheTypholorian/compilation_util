@@ -15,7 +15,7 @@ dependencies {
     implementation("org.ow2.asm:asm:9.11.1")
     implementation("org.ow2.asm:asm-tree:9.11.1")
     implementation("org.ow2.asm:asm-util:9.11.1")
-    implementation("net.typho:parsing_util:1.0.3")
+    implementation("net.typho:parsing_util:1.0.4")
 }
 
 kotlin {
