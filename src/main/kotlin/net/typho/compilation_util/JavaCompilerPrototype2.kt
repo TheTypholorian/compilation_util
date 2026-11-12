@@ -5,7 +5,7 @@ import kotlin.io.path.Path
 import kotlin.io.path.readText
 
 object JavaCompilerPrototype2 {
-    private sealed interface Token {
+    sealed interface Token {
         val range: IntRange
 
         fun toString(text: String): String {
@@ -13,11 +13,11 @@ object JavaCompilerPrototype2 {
         }
     }
 
-    private data class Identifier(
+    data class Identifier(
         override val range: IntRange
     ) : Token
 
-    private data class Text(
+    data class Text(
         override val range: IntRange,
         @JvmField
         val contentsRange: IntRange,
@@ -25,7 +25,7 @@ object JavaCompilerPrototype2 {
         val multiline: Boolean = false
     ) : Token
 
-    private data class Comment(
+    data class Comment(
         override val range: IntRange,
         @JvmField
         val contentsRange: IntRange,
@@ -33,11 +33,11 @@ object JavaCompilerPrototype2 {
         val inline: Boolean = false
     ) : Token
 
-    private data class Number(
+    data class Number(
         override val range: IntRange
     ) : Token
 
-    private enum class Keyword {
+    enum class Keyword {
         ABSTRACT,
         ASSERT,
         BOOLEAN,
@@ -90,13 +90,13 @@ object JavaCompilerPrototype2 {
         WHILE,
     }
 
-    private data class KeywordToken(
+    data class KeywordToken(
         override val range: IntRange,
         @JvmField
         val keyword: Keyword
     ) : Token
 
-    private data class Special(
+    data class Special(
         @JvmField
         val index: Int
     ) : Token {
@@ -107,8 +107,7 @@ object JavaCompilerPrototype2 {
     private fun Char.isSpecial() = !isWhitespace() && !isLetterOrDigit() && this != '"'
 
     @JvmStatic
-    fun main(args: Array<String>) {
-        val original = Path("tests/JavaTest.java").readText()
+    fun process(original: String): List<Token> {
         val input = ParsingIterator(original)
         val keywords = Keyword.entries.map { it.name.lowercase() }
         val tokens = mutableListOf<Token>()
@@ -224,6 +223,14 @@ object JavaCompilerPrototype2 {
                 fork.merge()
             }
         }
+
+        return tokens
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val original = Path("tests/JavaTest.java").readText()
+        val tokens = process(original)
 
         tokens.forEach { println(it.toString(original)) }
 
