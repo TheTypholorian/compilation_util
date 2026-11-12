@@ -62,8 +62,7 @@ public class JavaTest<T extends Number & Comparable<T>>
         return Collections.emptyIterator();
     }
 
-    public static <E extends Comparable<? super E>>
-    E maximum(E first, E second) {
+    public static <E extends Comparable<? super E>> E maximum(E first, E second) {
         return first.compareTo(second) >= 0 ? first : second;
     }
 

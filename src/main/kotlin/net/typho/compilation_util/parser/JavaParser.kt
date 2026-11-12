@@ -39,11 +39,6 @@ object JavaParser {
             when (val token = iterator.next()) {
                 is LexerToken.Identifier -> {
                     println("\t\t- Identifier '${token.text}'")
-
-                    if (last is LexerToken.Identifier) {
-                        throw DataReadException()
-                    }
-
                     last = token
                 }
                 is LexerToken.Punctuation -> when (token.char) {
@@ -67,15 +62,49 @@ object JavaParser {
                         } ?: throw DataReadException("Unterminated argument list")
                         readArgumentList(ParsingIterator(body))
                     }
+                    '=' -> {
+                        println("\t\t- Set on '${last!!.text}'")
+
+                        val init = iterator.nextUntil { index, value -> (value as? LexerToken.Punctuation)?.char == ';' } ?: throw DataReadException("Unterminated initializer")
+                        println("\t\t- Value ${init.map { it.text }}")
+                    }
                     ';' -> {
                         println()
                         last = null
+                    }
+                    '+' -> {
+                        if ((iterator.peek() as? LexerToken.Punctuation)?.char == '+') {
+                            iterator.next()
+                            println("\t\t- ++ on $last")
+                        }
+                    }
+                    '-' -> {
+                        if ((iterator.peek() as? LexerToken.Punctuation)?.char == '-') {
+                            iterator.next()
+                            println("\t\t- -- on $last")
+                        }
+                    }
+                    '<', '>' -> {
+                        println("\t\t- ${token.char} on $last")
                     }
                     else -> throw DataReadException(token.char.toString())
                 }
                 is LexerToken.Number -> println("\t\t- Number constant $token")
                 is LexerToken.Text -> println("\t\t- String constant $token")
-                is LexerToken.Keyword -> throw DataReadException(token.type.toString())
+                is LexerToken.Keyword -> when (token.type) {
+                    KeywordType.THIS -> {
+                        println("\t\t- This")
+                        last = token
+                    }
+                    KeywordType.RETURN -> {
+                        println("\t\t- Return")
+                        last = token
+                    }
+                    in KeywordType.TYPE_KEYWORDS -> {
+                        println("\t\t- Type ${token.type}")
+                    }
+                    else -> throw DataReadException(token.type.toString())
+                }
                 is LexerToken.Error -> throw DataReadException(token.message)
                 else -> {}
             }
@@ -83,16 +112,16 @@ object JavaParser {
     }
 
     @JvmStatic
-    fun readClassElement(iterator: ParsingIterator<LexerToken>) {
+    fun readAttribute(iterator: ParsingIterator<LexerToken>) {
         while (true) {
             val token = iterator.peek()
 
-            if (!(token is LexerToken.Punctuation && token.char == '@')) {
+            if ((token as? LexerToken.Punctuation)?.char == '@') {
+                iterator.next()
+                readAnnotation(iterator)
+            } else {
                 break
             }
-
-            iterator.next()
-            readAnnotation(iterator)
         }
 
         while (true) {
@@ -114,12 +143,10 @@ object JavaParser {
             iterator.next()
         }
 
-        val type = iterator.next()
-        println("\t- Attribute type: '${type.text}'")
+        val typeArgumentsOpen = iterator.peek()
 
-        val typeArgOpen = iterator.peek()
-
-        if ((typeArgOpen is LexerToken.Punctuation) && typeArgOpen.char == '<') {
+        // TODO this should only happen for methods, not fields nor classes
+        if ((typeArgumentsOpen as? LexerToken.Punctuation)?.char == '<') {
             iterator.next()
             var depth = 1
             val body = iterator.nextUntil { index, value ->
@@ -135,57 +162,198 @@ object JavaParser {
             readArgumentList(ParsingIterator(body))
         }
 
-        val name = (iterator.next() as LexerToken.Identifier).text
-        println("\t- Attribute name: $name")
+        val type = iterator.next()
 
-        when (val type = (iterator.next() as LexerToken.Punctuation).char) {
-            '(' -> {
-                println("\t- Attribute is a method")
+        if (type is LexerToken.Punctuation && type.char == '{') {
+            println("\t- Initializer block")
+            var depth = 1
+            val body = iterator.nextUntil { index, value ->
+                if (value is LexerToken.Punctuation) {
+                    when (value.char) {
+                        '{' -> depth++
+                        '}' -> depth--
+                    }
+                }
 
+                depth == 0
+            } ?: throw DataReadException("Unterminated method body")
+            readMethodBody(ParsingIterator(body))
+        } else if (type is LexerToken.Keyword && type.type in KeywordType.CLASS_TYPE_KEYWORDS) {
+            println("Class name: ${(iterator.next() as LexerToken.Identifier).text}")
+
+            val typeArgumentsOpen = iterator.peek()
+
+            if (typeArgumentsOpen is LexerToken.Punctuation && typeArgumentsOpen.char == '<') {
+                iterator.next()
                 var depth = 1
                 val body = iterator.nextUntil { index, value ->
                     if (value is LexerToken.Punctuation) {
                         when (value.char) {
-                            '(' -> depth++
-                            ')' -> depth--
+                            '<' -> depth++
+                            '>' -> depth--
                         }
                     }
 
                     depth == 0
-                } ?: throw DataReadException("Unterminated argument list")
-                readArgumentListDeclaration(ParsingIterator(body))
+                } ?: throw DataReadException("Unterminated type argument list")
+                readArgumentList(ParsingIterator(body))
+            }
 
-                when (val next = (iterator.peek() as LexerToken.Punctuation).char) {
-                    ';' -> println("\t- Method has no body")
-                    '{' -> {
-                        iterator.next()
-                        var depth = 1
-                        val body = iterator.nextUntil { index, value ->
-                            if (value is LexerToken.Punctuation) {
-                                when (value.char) {
-                                    '{' -> depth++
-                                    '}' -> depth--
-                                }
-                            }
+            val extends = iterator.peek()
 
-                            depth == 0
-                        } ?: throw DataReadException("Unterminated method body")
-                        readMethodBody(ParsingIterator(body))
+            if (extends is LexerToken.Keyword && extends.type == KeywordType.EXTENDS) {
+                iterator.next()
+                println("- Extends ${(iterator.next() as LexerToken.Identifier).text}")
+            }
+
+            val implements = iterator.peek()
+
+            if (implements is LexerToken.Keyword && implements.type == KeywordType.IMPLEMENTS) {
+                iterator.next()
+
+                while (true) {
+                    val name = iterator.peek()
+
+                    if (name !is LexerToken.Identifier) {
+                        break
                     }
-                    else -> throw DataReadException(next.toString())
+
+                    iterator.next()
+                    println("- Implements ${name.text}")
+
+                    val next = iterator.peek()
+
+                    if (next is LexerToken.Punctuation) {
+                        when (next.char) {
+                            '<' -> {
+                                iterator.next()
+                                var depth = 1
+                                val body = iterator.nextUntil { index, value ->
+                                    if (value is LexerToken.Punctuation) {
+                                        when (value.char) {
+                                            '<' -> depth++
+                                            '>' -> depth--
+                                        }
+                                    }
+
+                                    depth == 0
+                                } ?: throw DataReadException("Unterminated type argument")
+                                println("\t- Type arguments ${body.map { it.text }}")
+                            }
+                            ',' -> iterator.next()
+                            '{' -> break
+                            else -> throw DataReadException(next.char.toString())
+                        }
+                    } else {
+                        throw DataReadException(next.toString())
+                    }
+                }
+            }
+
+            val bodyOpen = iterator.peek()
+
+            if (bodyOpen is LexerToken.Punctuation && bodyOpen.char == '{') {
+                iterator.next()
+            } else {
+                throw DataReadException(bodyOpen.toString())
+            }
+
+            var depth = 1
+            val body = iterator.nextUntil { index, value ->
+                if (value is LexerToken.Punctuation) {
+                    when (value.char) {
+                        '{' -> depth++
+                        '}' -> depth--
+                    }
                 }
 
-                // TODO read body
+                depth == 0
+            } ?: throw DataReadException("Unterminated class body")
+            val iterator = ParsingIterator(body)
+
+            while (iterator.hasNext()) {
+                readAttribute(iterator)
+                println()
             }
-            '=' -> {
-                println("\t- Attribute is an initialized field")
-                val init = iterator.nextUntil { index, value -> (value as? LexerToken.Punctuation)?.char == ';' } ?: throw DataReadException("Unterminated initializer")
-                println("\t- Attribute initializer ${init.map { it.text }}")
+        } else {
+            println("\t- Attribute type: '${type.text}'")
+
+            val typeArgOpen = iterator.peek()
+
+            if ((typeArgOpen is LexerToken.Punctuation) && typeArgOpen.char == '<') {
+                iterator.next()
+                var depth = 1
+                val body = iterator.nextUntil { index, value ->
+                    if (value is LexerToken.Punctuation) {
+                        when (value.char) {
+                            '<' -> depth++
+                            '>' -> depth--
+                        }
+                    }
+
+                    depth == 0
+                } ?: throw DataReadException("Unterminated type argument list")
+                readArgumentList(ParsingIterator(body))
             }
-            ';' -> {
-                println("\t- Attribute is an uninitialized field")
+
+            val name = iterator.peek()
+
+            if (name is LexerToken.Punctuation && name.char == '(') {
+                println("\t- Attribute is a constructor")
+            } else {
+                println("\t- Attribute name: ${(name as LexerToken.Identifier).text}")
+                iterator.next()
             }
-            else -> throw DataReadException(type.toString())
+
+            when (val type = (iterator.next() as LexerToken.Punctuation).char) {
+                '(' -> {
+                    println("\t- Attribute is a method")
+
+                    var depth = 1
+                    val body = iterator.nextUntil { index, value ->
+                        if (value is LexerToken.Punctuation) {
+                            when (value.char) {
+                                '(' -> depth++
+                                ')' -> depth--
+                            }
+                        }
+
+                        depth == 0
+                    } ?: throw DataReadException("Unterminated argument list")
+                    readArgumentListDeclaration(ParsingIterator(body))
+
+                    when (val next = (iterator.peek() as LexerToken.Punctuation).char) {
+                        ';' -> println("\t- Method has no body")
+                        '{' -> {
+                            iterator.next()
+                            var depth = 1
+                            val body = iterator.nextUntil { index, value ->
+                                if (value is LexerToken.Punctuation) {
+                                    when (value.char) {
+                                        '{' -> depth++
+                                        '}' -> depth--
+                                    }
+                                }
+
+                                depth == 0
+                            } ?: throw DataReadException("Unterminated method body")
+                            readMethodBody(ParsingIterator(body))
+                        }
+                        else -> throw DataReadException(next.toString())
+                    }
+
+                    // TODO read body
+                }
+                '=' -> {
+                    println("\t- Attribute is an initialized field")
+                    val init = iterator.nextUntil { index, value -> (value as? LexerToken.Punctuation)?.char == ';' } ?: throw DataReadException("Unterminated initializer")
+                    println("\t- Attribute initializer ${init.map { it.text }}")
+                }
+                ';' -> {
+                    println("\t- Attribute is an uninitialized field")
+                }
+                else -> throw DataReadException(type.toString())
+            }
         }
     }
 
@@ -212,145 +380,6 @@ object JavaParser {
             val iterator = ParsingIterator(body)
 
             readArgumentList(iterator)
-        }
-    }
-
-    @JvmStatic
-    fun readClass(iterator: ParsingIterator<LexerToken>) {
-        while (true) {
-            val token = iterator.peek()
-
-            if (token !is LexerToken.Punctuation) {
-                break
-            }
-
-            when (token.char) {
-                '@' -> {
-                    iterator.next()
-                    readAnnotation(iterator)
-                }
-                else -> throw DataReadException(token.char.toString())
-            }
-        }
-
-        iterator.forkAndMergeIf {
-            when (val token = next()) {
-                is LexerToken.Keyword -> if (token.type in KeywordType.ACCESS_KEYWORDS) {
-                    println("Class access: ${token.type}")
-                    true
-                } else {
-                    false
-                }
-                else -> throw DataReadException(token.toString())
-            }
-        }
-
-        iterator.forkAndMergeIf {
-            val token = next() as LexerToken.Keyword
-
-            if (token.type in KeywordType.CLASS_TYPE_KEYWORDS) {
-                println("Class type: ${token.type}")
-                true
-            } else {
-                false
-            }
-        }
-
-        println("Class name: ${(iterator.next() as LexerToken.Identifier).text}")
-
-        val typeArgumentsOpen = iterator.peek()
-
-        if (typeArgumentsOpen is LexerToken.Punctuation && typeArgumentsOpen.char == '<') {
-            iterator.next()
-            var depth = 1
-            val body = iterator.nextUntil { index, value ->
-                if (value is LexerToken.Punctuation) {
-                    when (value.char) {
-                        '<' -> depth++
-                        '>' -> depth--
-                    }
-                }
-
-                depth == 0
-            } ?: throw DataReadException("Unterminated type argument list")
-            readArgumentList(ParsingIterator(body))
-        }
-
-        val extends = iterator.peek()
-
-        if (extends is LexerToken.Keyword && extends.type == KeywordType.EXTENDS) {
-            iterator.next()
-            println("- Extends ${(iterator.next() as LexerToken.Identifier).text}")
-        }
-
-        val implements = iterator.peek()
-
-        if (implements is LexerToken.Keyword && implements.type == KeywordType.IMPLEMENTS) {
-            iterator.next()
-
-            while (true) {
-                val name = iterator.peek()
-
-                if (name !is LexerToken.Identifier) {
-                    break
-                }
-
-                iterator.next()
-                println("- Implements ${name.text}")
-
-                val next = iterator.peek()
-
-                if (next is LexerToken.Punctuation) {
-                    when (next.char) {
-                        '<' -> {
-                            iterator.next()
-                            var depth = 1
-                            val body = iterator.nextUntil { index, value ->
-                                if (value is LexerToken.Punctuation) {
-                                    when (value.char) {
-                                        '<' -> depth++
-                                        '>' -> depth--
-                                    }
-                                }
-
-                                depth == 0
-                            } ?: throw DataReadException("Unterminated type argument")
-                            println("\t- Type arguments ${body.map { it.text }}")
-                        }
-                        ',' -> iterator.next()
-                        '{' -> break
-                        else -> throw DataReadException(next.char.toString())
-                    }
-                } else {
-                    throw DataReadException(next.toString())
-                }
-            }
-        }
-
-        val bodyOpen = iterator.peek()
-
-        if (bodyOpen is LexerToken.Punctuation && bodyOpen.char == '{') {
-            iterator.next()
-        } else {
-            throw DataReadException(bodyOpen.toString())
-        }
-
-        var depth = 1
-        val body = iterator.nextUntil { index, value ->
-            if (value is LexerToken.Punctuation) {
-                when (value.char) {
-                    '{' -> depth++
-                    '}' -> depth--
-                }
-            }
-
-            depth == 0
-        } ?: throw DataReadException("Unterminated class body")
-        val iterator = ParsingIterator(body)
-
-        while (iterator.hasNext()) {
-            readClassElement(iterator)
-            println()
         }
     }
 
@@ -382,7 +411,7 @@ object JavaParser {
             }
         }
 
-        readClass(iterator)
+        readAttribute(iterator)
 
         while (iterator.hasNext()) {
             println("Leftover: ${iterator.next()}")
