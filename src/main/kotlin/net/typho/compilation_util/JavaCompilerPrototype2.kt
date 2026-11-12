@@ -25,6 +25,14 @@ object JavaCompilerPrototype2 {
         val multiline: Boolean = false
     ) : Token
 
+    private data class Comment(
+        override val range: IntRange,
+        @JvmField
+        val contentsRange: IntRange,
+        @JvmField
+        val inline: Boolean = false
+    ) : Token
+
     private data class Number(
         override val range: IntRange
     ) : Token
@@ -111,10 +119,30 @@ object JavaCompilerPrototype2 {
 
             while (input.peek().isSpecial()) { // Slashes are a special character
                 if (input.currentMatches("//")) {
+                    val startIndex1 = input.index
+                    input.index += 2
+                    val startIndex2 = input.index
+
                     input.skipUntil { index, char -> char == '\n' }
+
+                    val endIndex = input.index
+
+                    tokens.add(Comment(startIndex1..endIndex, startIndex2..endIndex))
+
                     continue@main
                 } else if (input.currentMatches("/*")) {
+                    val startIndex1 = input.index
+                    input.index += 2
+                    val startIndex2 = input.index
+
                     input.skipUntil { index, char -> input.currentMatches("*/") }
+
+                    val endIndex2 = input.index
+                    input.index += 2
+                    val endIndex1 = input.index
+
+                    tokens.add(Comment(startIndex1..endIndex1, startIndex2..endIndex2, true))
+
                     continue@main
                 }
 
@@ -198,5 +226,16 @@ object JavaCompilerPrototype2 {
         }
 
         tokens.forEach { println(it.toString(original)) }
+
+        // ensure that all non-whitespace chars have a token
+        var test = original
+
+        tokens.forEach { token ->
+            test = test.replaceRange(token.range, " ".repeat(token.range.last - token.range.first + 1))
+        }
+
+        if (test.isNotBlank()) {
+            error("")
+        }
     }
 }
