@@ -109,10 +109,14 @@ open class JavaLexer {
                     lastToken = token
 
                     if (token.range.first > change.offset + change.length) {
+                        iterator.set(token.copyWithOffset(offset))
+
                         while (iterator.hasNext()) {
-                            iterator.set(token.copyWithOffset(offset))
                             token = iterator.next()
+                            iterator.set(token.copyWithOffset(offset))
                         }
+
+                        break
                     }
                 }
 
@@ -124,7 +128,7 @@ open class JavaLexer {
             return null
         }
 
-        val range = firstToken.range.first..lastToken.range.last
+        val range = firstToken.range.first..(lastToken.range.last + offset)
         val sublist = tokens.subList(firstTokenIndex, lastTokenIndex + 1)
         sublist.clear()
         process(change.document.getText(range.first, range.last - range.first), sublist)
