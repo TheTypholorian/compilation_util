@@ -1,75 +1,105 @@
 package net.typho.compilation_util.lexer
 
-private fun IntRange.offset(offset: Int) = (first + offset)..(last + offset)
+sealed class LexerToken(
+    @JvmField
+    val text: StringRange
+) {
+    abstract fun copyWithOffset(offset: Int): LexerToken
 
-sealed interface LexerToken {
-    val range: IntRange
-
-    fun copyWithOffset(offset: Int): LexerToken
-
-    fun toString(text: String): String {
-        return text.substring(range.first, range.last)
+    override fun toString(): String {
+        return "${javaClass.simpleName} at ${this@LexerToken.text.range}: $text"
     }
 
-    data class Identifier(
-        override val range: IntRange
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(range = range.offset(offset))
+    class Identifier(
+        range: StringRange
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Identifier(range = text.offset(offset))
     }
 
-    data class Text(
-        override val range: IntRange,
+    class Text(
+        range: StringRange,
         @JvmField
-        val contentsRange: IntRange,
+        val contentsRange: StringRange,
         @JvmField
         val quoteType: String
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(
-            range = range.offset(offset),
-            contentsRange = contentsRange.offset(offset)
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Text(
+            text.offset(offset),
+            contentsRange.offset(offset),
+            quoteType
         )
     }
 
-    data class Comment(
-        override val range: IntRange,
+    class Comment(
+        range: StringRange,
         @JvmField
-        val contentsRange: IntRange,
+        val contentsRange: StringRange,
         @JvmField
-        val inline: Boolean = false
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(
-            range = range.offset(offset),
-            contentsRange = contentsRange.offset(offset)
+        val inline: Boolean
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Comment(
+            text.offset(offset),
+            contentsRange.offset(offset),
+            inline
         )
     }
 
-    data class Number(
-        override val range: IntRange
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(range = range.offset(offset))
+    class Number(
+        range: StringRange
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Number(
+            text.offset(offset)
+        )
     }
 
-    data class Keyword(
-        override val range: IntRange
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(range = range.offset(offset))
+    class Keyword(
+        range: StringRange
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Keyword(
+            text.offset(offset)
+        )
     }
 
-    data class Punctuation(
+    class Punctuation(
+        text: String,
         @JvmField
         val index: Int
-    ) : LexerToken {
-        override val range: IntRange
-            get() = index..index + 1
+    ) : LexerToken(StringRange(text, index..index + 1)) {
+        override fun copyWithOffset(offset: Int) = Punctuation(
+            text.text,
+            index + offset
+        )
 
-        override fun copyWithOffset(offset: Int) = copy(index = index + offset)
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Punctuation) return false
+
+            if (index != other.index) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            return index
+        }
+
+        override fun toString(): String {
+            return "${javaClass.simpleName} at $index: $text"
+        }
     }
 
-    data class Error(
-        override val range: IntRange,
+    class Error(
+        range: StringRange,
         @JvmField
         val message: String
-    ) : LexerToken {
-        override fun copyWithOffset(offset: Int) = copy(range = range.offset(offset))
+    ) : LexerToken(range) {
+        override fun copyWithOffset(offset: Int) = Error(
+            text.offset(offset),
+            message
+        )
+
+        override fun toString(): String {
+            return "${javaClass.simpleName} at ${this@Error.text.range} (text $text): $message"
+        }
     }
 }

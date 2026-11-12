@@ -2,6 +2,9 @@ package net.typho.compilation_util.lexer
 
 import net.typho.parsing_util.ParsingIterator
 import javax.swing.event.DocumentEvent
+import kotlin.io.path.Path
+import kotlin.io.path.absolute
+import kotlin.io.path.readText
 import kotlin.math.max
 import kotlin.math.min
 
@@ -10,7 +13,12 @@ open class JavaLexer {
         @JvmStatic
         fun Char.isJavaPunctuation() = !isWhitespace() && !isLetterOrDigit() && this != '"'
 
-        private fun IntRange.intersects(other: IntRange) = first <= other.last && other.first <= last
+        @JvmStatic
+        fun main(args: Array<String>) {
+            val input = Path("").absolute().parent.resolve("compilation_util").resolve("tests").resolve("JavaTest.java").readText()
+            val tokens = JavaLexer().process(input)
+            tokens.forEach { println(it) }
+        }
     }
 
     @JvmField
@@ -89,8 +97,8 @@ open class JavaLexer {
 
         val changeRange = change.offset..(change.offset + change.length)
 
-        val firstTokenIndex = tokens.indexOfFirst { it.range.last >= changeRange.first }
-        val lastTokenIndex = tokens.indexOfLast { it.range.first <= changeRange.last }
+        val firstTokenIndex = tokens.indexOfFirst { it.text.range.last >= changeRange.first }
+        val lastTokenIndex = tokens.indexOfLast { it.text.range.first <= changeRange.last }
 
         if (firstTokenIndex == -1 || lastTokenIndex == -1) {
             return null
@@ -106,14 +114,14 @@ open class JavaLexer {
             if (subList.isEmpty()) {
                 changeRange
             } else {
-                min(subList.first().range.first, changeRange.first)..max(subList.last().range.last + offset, changeRange.last)
+                min(subList.first().text.range.first, changeRange.first)..max(subList.last().text.range.last + offset, changeRange.last)
             }
         } else {
             if (subList.isEmpty()) {
                 return null
             }
 
-            min(subList.first().range.first, changeRange.first)..min(subList.last().range.last, changeRange.last + offset)
+            min(subList.first().text.range.first, changeRange.first)..min(subList.last().text.range.last, changeRange.last + offset)
         }
         subList.clear()
         process(change.document.getText(range.first, range.last - range.first), subList)
@@ -140,7 +148,7 @@ open class JavaLexer {
 
                     val endIndex = input.index
 
-                    output.add(LexerToken.Comment(startIndex1..endIndex, startIndex2..endIndex))
+                    output.add(LexerToken.Comment(input.text.range(startIndex1..endIndex), input.text.range(startIndex2..endIndex), false))
                 } else if (input.currentMatches("/*")) {
                     val startIndex1 = input.index
                     input.index += 2
@@ -152,9 +160,9 @@ open class JavaLexer {
                     input.index += 2
                     val endIndex1 = input.index
 
-                    output.add(LexerToken.Comment(startIndex1..endIndex1, startIndex2..endIndex2, true))
+                    output.add(LexerToken.Comment(input.text.range(startIndex1..endIndex1), input.text.range(startIndex2..endIndex2), true))
                 } else {
-                    output.add(LexerToken.Punctuation(input.index))
+                    output.add(LexerToken.Punctuation(input.text, input.index))
                     input.next()
                 }
 
@@ -168,7 +176,7 @@ open class JavaLexer {
                     !(char.isDigit() || char == 'x' || char == 'p' || char == 'L' || char == '.' || char == '-' || char == '+' || char == '_' || char in 'a'..'f')
                 }
                 val endIndex = input.index
-                output.add(LexerToken.Number(startIndex..endIndex))
+                output.add(LexerToken.Number(input.text.range(startIndex..endIndex)))
 
                 continue
             }
@@ -184,7 +192,7 @@ open class JavaLexer {
 
             when {
                 word in keywords -> {
-                    output.add(LexerToken.Keyword(wordStart..wordEnd))
+                    output.add(LexerToken.Keyword(input.text.range(wordStart..wordEnd)))
                     fork.merge()
                 }
                 word[0] == '"' || word[0] == '\'' -> {
@@ -206,13 +214,13 @@ open class JavaLexer {
                             } else {
                                 input.currentMatches("\"\"\"")
                             }
-                        } ?: output.add(LexerToken.Error(startIndex1..input.index, "Unterminated string")).also { break }
+                        } ?: output.add(LexerToken.Error(input.text.range(startIndex1..input.index), "Unterminated string")).also { break }
 
                         val endIndex2 = input.index
                         input.index += 3
                         val endIndex1 = input.index
 
-                        output.add(LexerToken.Text(startIndex1..endIndex1, startIndex2..endIndex2, "\"\"\""))
+                        output.add(LexerToken.Text(input.text.range(startIndex1..endIndex1), input.text.range(startIndex2..endIndex2), "\"\"\""))
                     } else {
                         val startIndex1 = input.index++
                         val startIndex2 = input.index
@@ -220,7 +228,7 @@ open class JavaLexer {
                         var escaped = false
                         input.skipUntil { index, char ->
                             if (char == '\n') {
-                                output.add(LexerToken.Error(startIndex1..input.index, "Unterminated string"))
+                                output.add(LexerToken.Error(input.text.range(startIndex1..input.index), "Unterminated string"))
                                 false
                             } else if (char == '\\') {
                                 escaped = true
@@ -231,16 +239,16 @@ open class JavaLexer {
                             } else {
                                 char == quote
                             }
-                        } ?: output.add(LexerToken.Error(startIndex1..input.index, "Unterminated string")).also { break }
+                        } ?: output.add(LexerToken.Error(input.text.range(startIndex1..input.index), "Unterminated string")).also { break }
 
                         val endIndex2 = input.index++
                         val endIndex1 = input.index
 
-                        output.add(LexerToken.Text(startIndex1..endIndex1, startIndex2..endIndex2, quote.toString()))
+                        output.add(LexerToken.Text(input.text.range(startIndex1..endIndex1), input.text.range(startIndex2..endIndex2), quote.toString()))
                     }
                 }
                 else -> {
-                    output.add(LexerToken.Identifier(wordStart..wordEnd))
+                    output.add(LexerToken.Identifier(input.text.range(wordStart..wordEnd)))
                     fork.merge()
                 }
             }
