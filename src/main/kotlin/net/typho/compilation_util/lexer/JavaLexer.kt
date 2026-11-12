@@ -87,13 +87,12 @@ open class JavaLexer {
             else -> return null
         }
 
-        val changeRange = change.offset..(change.offset + change.length + offset)
+        val changeRange = change.offset..(change.offset + change.length)
 
         val firstTokenIndex = tokens.indexOfFirst { it.range.last >= changeRange.first }
         val lastTokenIndex = tokens.indexOfLast { it.range.first <= changeRange.last }
 
         if (firstTokenIndex == -1 || lastTokenIndex == -1) {
-            println("Tokens don't care about change")
             return null
         }
 
@@ -103,29 +102,23 @@ open class JavaLexer {
 
         val subList = tokens.subList(firstTokenIndex, lastTokenIndex + 1)
 
-        if (subList.isEmpty()) {
-            return null
-        }
+        val range = if (offset > 0) {
+            if (subList.isEmpty()) {
+                changeRange
+            } else {
+                min(subList.first().range.first, changeRange.first)..max(subList.last().range.last + offset, changeRange.last)
+            }
+        } else {
+            if (subList.isEmpty()) {
+                return null
+            }
 
-        val range = min(subList.first().range.first, changeRange.first)..max(subList.last().range.last + offset.coerceAtLeast(0), changeRange.last + offset.coerceAtLeast(0))
-        val oldList = subList.toList()
+            min(subList.first().range.first, changeRange.first)..min(subList.last().range.last, changeRange.last + offset)
+        }
         subList.clear()
         process(change.document.getText(range.first, range.last - range.first), subList)
 
         subList.replaceAll { it.copyWithOffset(range.first) }
-
-        val shouldBe = mutableListOf<LexerToken>()
-        process(change.document.getText(0, change.document.length), shouldBe)
-
-        println("Update")
-        println("Modification: $changeRange")
-        println("Offset: $offset")
-        println("Start Index: $firstTokenIndex")
-        println("End Index: $lastTokenIndex")
-        println("Old contents: $oldList")
-        println("New contents: $subList")
-        println("Text being processed: '${change.document.getText(range.first, range.last - range.first).replace("\r", "\\r").replace("\n", "\\n")}'")
-        println("Range: $range")
 
         return UpdateResult(range, subList)
     }
@@ -160,10 +153,10 @@ open class JavaLexer {
                     val endIndex1 = input.index
 
                     output.add(LexerToken.Comment(startIndex1..endIndex1, startIndex2..endIndex2, true))
+                } else {
+                    output.add(LexerToken.Punctuation(input.index))
+                    input.next()
                 }
-
-                output.add(LexerToken.Punctuation(input.index))
-                input.next()
 
                 continue
             }
