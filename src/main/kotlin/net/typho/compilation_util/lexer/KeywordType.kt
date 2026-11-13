@@ -1,139 +1,100 @@
 package net.typho.compilation_util.lexer
 
-class KeywordType private constructor(
-    @JvmField
-    val name: String,
-    private val id: Int
-) {
+interface KeywordType {
     companion object {
-        private val allKeywords = mutableMapOf<String, KeywordType>()
-
-        @JvmStatic
-        fun get(name: String) = allKeywords.computeIfAbsent(name) { KeywordType(name, allKeywords.size) }
-
         @JvmField
-        val ABSTRACT = get("abstract")
-        @JvmField
-        val ASSERT = get("assert")
-        @JvmField
-        val BOOLEAN = get("boolean")
-        @JvmField
-        val BREAK = get("break")
-        @JvmField
-        val BYTE = get("byte")
-        @JvmField
-        val CASE = get("case")
-        @JvmField
-        val CATCH = get("catch")
-        @JvmField
-        val CHAR = get("char")
-        @JvmField
-        val CLASS = get("class")
-        @JvmField
-        val CONST = get("const")
-        @JvmField
-        val CONTINUE = get("continue")
-        @JvmField
-        val DEFAULT = get("default")
-        @JvmField
-        val DO = get("do")
-        @JvmField
-        val DOUBLE = get("double")
-        @JvmField
-        val ELSE = get("else")
-        @JvmField
-        val ENUM = get("enum")
-        @JvmField
-        val EXTENDS = get("extends")
-        @JvmField
-        val FINAL = get("final")
-        @JvmField
-        val FINALLY = get("finally")
-        @JvmField
-        val FLOAT = get("float")
-        @JvmField
-        val FOR = get("for")
-        @JvmField
-        val GOTO = get("goto")
-        @JvmField
-        val IF = get("if")
-        @JvmField
-        val IMPLEMENTS = get("implements")
-        @JvmField
-        val IMPORT = get("import")
-        @JvmField
-        val INSTANCEOF = get("instanceof")
-        @JvmField
-        val INT = get("int")
-        @JvmField
-        val INTERFACE = get("interface")
-        @JvmField
-        val LONG = get("long")
-        @JvmField
-        val NATIVE = get("native")
-        @JvmField
-        val NEW = get("new")
-        @JvmField
-        val PACKAGE = get("package")
-        @JvmField
-        val PRIVATE = get("private")
-        @JvmField
-        val PROTECTED = get("protected")
-        @JvmField
-        val PUBLIC = get("public")
-        @JvmField
-        val RECORD = get("record")
-        @JvmField
-        val RETURN = get("return")
-        @JvmField
-        val SHORT = get("short")
-        @JvmField
-        val STATIC = get("static")
-        @JvmField
-        val STRICTFP = get("strictfp")
-        @JvmField
-        val SUPER = get("super")
-        @JvmField
-        val SWITCH = get("switch")
-        @JvmField
-        val SYNCHRONIZED = get("synchronized")
-        @JvmField
-        val THIS = get("this")
-        @JvmField
-        val THROW = get("throw")
-        @JvmField
-        val THROWS = get("throws")
-        @JvmField
-        val TRANSIENT = get("transient")
-        @JvmField
-        val TRY = get("try")
-        @JvmField
-        val VOID = get("void")
-        @JvmField
-        val VOLATILE = get("volatile")
-        @JvmField
-        val WHILE = get("while")
-
-        @JvmField
-        val ACCESS = listOf(PUBLIC, PROTECTED, PRIVATE)
-        @JvmField
-        val PRIMITIVE_TYPES = listOf(BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE, VOID)
-        @JvmField
-        val CLASS_TYPE = listOf(CLASS, INTERFACE, ENUM, RECORD)
+        val all: Map<String, KeywordType> = (Access.entries + Modifier.entries + Primitive.entries + SelfReference.entries + HeaderValue.entries + Operation.entries + ClassType.entries + ClassModifier.entries).associateBy { it.id }
     }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is KeywordType) return false
+    val id: String
 
-        if (id != other.id) return false
+    enum class Access : KeywordType {
+        PUBLIC,
+        PROTECTED,
+        PRIVATE;
 
-        return true
+        override val id = name.lowercase()
     }
 
-    override fun hashCode(): Int {
-        return id
+    enum class Modifier : KeywordType {
+        ABSTRACT,
+        CONST,
+        FINAL,
+        NATIVE,
+        STATIC,
+        STRICTFP,
+        SYNCHRONIZED,
+        THROWS,
+        TRANSIENT,
+        VOLATILE;
+
+        override val id = name.lowercase()
     }
 
-    override fun toString() = name
+    enum class Primitive : KeywordType {
+        BYTE,
+        SHORT,
+        CHAR,
+        INT,
+        LONG,
+        FLOAT,
+        DOUBLE,
+        VOID;
+
+        override val id = name.lowercase()
+    }
+
+    enum class SelfReference : KeywordType {
+        THIS,
+        SUPER;
+
+        override val id = name.lowercase()
+    }
+
+    enum class HeaderValue : KeywordType {
+        PACKAGE,
+        IMPORT;
+
+        override val id = name.lowercase()
+    }
+
+    enum class Operation : KeywordType {
+        ASSERT,
+        BREAK,
+        CASE,
+        CATCH,
+        CONTINUE,
+        DEFAULT,
+        DO,
+        ELSE,
+        FINALLY,
+        FOR,
+        GOTO,
+        IF,
+        INSTANCEOF,
+        NEW,
+        RETURN,
+        SWITCH,
+        THROW,
+        TRY,
+        WHILE;
+
+        override val id = name.lowercase()
+    }
+
+    enum class ClassType : KeywordType {
+        CLASS,
+        ENUM,
+        INTERFACE,
+        RECORD;
+
+        override val id = name.lowercase()
+    }
+
+    enum class ClassModifier : KeywordType {
+        EXTENDS,
+        IMPLEMENTS;
+
+        override val id = name.lowercase()
+    }
 }

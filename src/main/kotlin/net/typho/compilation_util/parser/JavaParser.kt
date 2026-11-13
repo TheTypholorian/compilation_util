@@ -6,14 +6,6 @@ import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
 
 object JavaParser {
-    private inline fun <V> ParsingIterator<V>.forkAndMergeIf(func: ParsingIterator<V>.() -> Boolean) {
-        val fork = fork()
-
-        if (func(fork)) {
-            fork.merge()
-        }
-    }
-
     @JvmStatic
     fun readArgumentList(iterator: ParsingIterator<LexerToken>) {
         while (iterator.hasNext()) {
@@ -92,16 +84,17 @@ object JavaParser {
                 is LexerToken.Number -> println("\t\t- Number constant $token")
                 is LexerToken.Text -> println("\t\t- String constant $token")
                 is LexerToken.Keyword -> when (token.type) {
-                    KeywordType.THIS -> {
-                        println("\t\t- This")
+                    is KeywordType.SelfReference -> {
+                        println("\t\t- ${token.type}")
                         last = token
                     }
-                    KeywordType.RETURN -> {
+                    KeywordType.Operation.RETURN -> {
                         println("\t\t- Return")
                         last = token
                     }
-                    in KeywordType.PRIMITIVE_TYPES -> {
+                    is KeywordType.Primitive -> {
                         println("\t\t- Type ${token.type}")
+                        last = token
                     }
                     else -> throw DataReadException(token.type.toString())
                 }
@@ -132,11 +125,8 @@ object JavaParser {
             }
 
             when (token.type) {
-                in KeywordType.ACCESS -> println("\t- Attribute access: ${token.type}")
-                KeywordType.STATIC -> println("\t- Attribute is static")
-                KeywordType.FINAL -> println("\t- Attribute is final")
-                KeywordType.VOLATILE -> println("\t- Attribute is volatile")
-                KeywordType.TRANSIENT -> println("\t- Attribute is transient")
+                is KeywordType.Access -> println("\t- Attribute access: ${token.type}")
+                is KeywordType.Modifier -> println("\t- Attribute is ${token.type}")
                 else -> break
             }
 
@@ -178,7 +168,7 @@ object JavaParser {
                 depth == 0
             } ?: throw DataReadException("Unterminated method body")
             readMethodBody(ParsingIterator(body))
-        } else if (type is LexerToken.Keyword && type.type in KeywordType.CLASS_TYPE) {
+        } else if (type is LexerToken.Keyword && type.type is KeywordType.ClassType) {
             println("Class name: ${(iterator.next() as LexerToken.Identifier).text}")
 
             val typeArgumentsOpen = iterator.peek()
@@ -201,14 +191,14 @@ object JavaParser {
 
             val extends = iterator.peek()
 
-            if (extends is LexerToken.Keyword && extends.type == KeywordType.EXTENDS) {
+            if (extends is LexerToken.Keyword && extends.type == KeywordType.ClassModifier.EXTENDS) {
                 iterator.next()
                 println("- Extends ${(iterator.next() as LexerToken.Identifier).text}")
             }
 
             val implements = iterator.peek()
 
-            if (implements is LexerToken.Keyword && implements.type == KeywordType.IMPLEMENTS) {
+            if (implements is LexerToken.Keyword && implements.type == KeywordType.ClassModifier.IMPLEMENTS) {
                 iterator.next()
 
                 while (true) {
@@ -391,7 +381,7 @@ object JavaParser {
 
         val token = iterator.peek()
 
-        if (token is LexerToken.Keyword && token.type == KeywordType.PACKAGE) {
+        if (token is LexerToken.Keyword && token.type == KeywordType.HeaderValue.PACKAGE) {
             iterator.next()
 
             val pkg = iterator.nextUntil { index, value -> (value as? LexerToken.Punctuation)?.char == ';' } ?: throw DataReadException()
@@ -401,7 +391,7 @@ object JavaParser {
         while (true) {
             val token = iterator.peek()
 
-            if (token is LexerToken.Keyword && token.type == KeywordType.IMPORT) {
+            if (token is LexerToken.Keyword && token.type == KeywordType.HeaderValue.IMPORT) {
                 iterator.next()
 
                 val pkg = iterator.nextUntil { index, value -> (value as? LexerToken.Punctuation)?.char == ';' } ?: throw DataReadException()

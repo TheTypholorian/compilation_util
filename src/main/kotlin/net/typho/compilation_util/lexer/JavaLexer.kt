@@ -26,68 +26,6 @@ open class JavaLexer {
         }
     }
 
-    @JvmField
-	protected val keywords = mutableMapOf<String, KeywordType>()
-
-    protected fun keywords(vararg keywords: KeywordType) {
-        keywords.forEach { this.keywords.putIfAbsent(it.name, it) }
-    }
-
-    init {
-        keywords(
-            KeywordType.ABSTRACT,
-            KeywordType.ASSERT,
-            KeywordType.BOOLEAN,
-            KeywordType.BREAK,
-            KeywordType.BYTE,
-            KeywordType.CASE,
-            KeywordType.CATCH,
-            KeywordType.CHAR,
-            KeywordType.CLASS,
-            KeywordType.CONST,
-            KeywordType.CONTINUE,
-            KeywordType.DEFAULT,
-            KeywordType.DO,
-            KeywordType.DOUBLE,
-            KeywordType.ELSE,
-            KeywordType.ENUM,
-            KeywordType.EXTENDS,
-            KeywordType.FINAL,
-            KeywordType.FINALLY,
-            KeywordType.FLOAT,
-            KeywordType.FOR,
-            KeywordType.GOTO,
-            KeywordType.IF,
-            KeywordType.IMPLEMENTS,
-            KeywordType.IMPORT,
-            KeywordType.INSTANCEOF,
-            KeywordType.INT,
-            KeywordType.INTERFACE,
-            KeywordType.LONG,
-            KeywordType.NATIVE,
-            KeywordType.NEW,
-            KeywordType.PACKAGE,
-            KeywordType.PRIVATE,
-            KeywordType.PROTECTED,
-            KeywordType.PUBLIC,
-            KeywordType.RETURN,
-            KeywordType.SHORT,
-            KeywordType.STATIC,
-            KeywordType.STRICTFP,
-            KeywordType.SUPER,
-            KeywordType.SWITCH,
-            KeywordType.SYNCHRONIZED,
-            KeywordType.THIS,
-            KeywordType.THROW,
-            KeywordType.THROWS,
-            KeywordType.TRANSIENT,
-            KeywordType.TRY,
-            KeywordType.VOID,
-            KeywordType.VOLATILE,
-            KeywordType.WHILE
-        )
-    }
-
     /**
      * No tokens will ever overlap, but they will not be snug.
      */
@@ -204,8 +142,8 @@ open class JavaLexer {
             }
 
             when {
-                word in keywords -> {
-                    output.add(LexerToken.Keyword(input.text.range(wordStart..wordEnd), keywords[word]!!))
+                word in KeywordType.all -> {
+                    output.add(LexerToken.Keyword(input.text.range(wordStart..wordEnd), KeywordType.all[word]!!))
                     fork.merge()
                 }
                 word[0] == '"' || word[0] == '\'' -> {
