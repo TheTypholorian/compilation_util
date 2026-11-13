@@ -100,7 +100,7 @@ object JavaParser {
                         println("\t\t- Return")
                         last = token
                     }
-                    in KeywordType.TYPE_KEYWORDS -> {
+                    in KeywordType.PRIMITIVE_TYPES -> {
                         println("\t\t- Type ${token.type}")
                     }
                     else -> throw DataReadException(token.type.toString())
@@ -132,7 +132,7 @@ object JavaParser {
             }
 
             when (token.type) {
-                in KeywordType.ACCESS_KEYWORDS -> println("\t- Attribute access: ${token.type}")
+                in KeywordType.ACCESS -> println("\t- Attribute access: ${token.type}")
                 KeywordType.STATIC -> println("\t- Attribute is static")
                 KeywordType.FINAL -> println("\t- Attribute is final")
                 KeywordType.VOLATILE -> println("\t- Attribute is volatile")
@@ -178,7 +178,7 @@ object JavaParser {
                 depth == 0
             } ?: throw DataReadException("Unterminated method body")
             readMethodBody(ParsingIterator(body))
-        } else if (type is LexerToken.Keyword && type.type in KeywordType.CLASS_TYPE_KEYWORDS) {
+        } else if (type is LexerToken.Keyword && type.type in KeywordType.CLASS_TYPE) {
             println("Class name: ${(iterator.next() as LexerToken.Identifier).text}")
 
             val typeArgumentsOpen = iterator.peek()

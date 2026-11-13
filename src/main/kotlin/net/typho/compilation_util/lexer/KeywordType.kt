@@ -115,11 +115,11 @@ class KeywordType private constructor(
         val WHILE = get("while")
 
         @JvmField
-        val ACCESS_KEYWORDS = listOf(PUBLIC, PROTECTED, PRIVATE)
+        val ACCESS = listOf(PUBLIC, PROTECTED, PRIVATE)
         @JvmField
-        val TYPE_KEYWORDS = listOf(BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE, VOID)
+        val PRIMITIVE_TYPES = listOf(BYTE, SHORT, CHAR, INT, LONG, FLOAT, DOUBLE, VOID)
         @JvmField
-        val CLASS_TYPE_KEYWORDS = listOf(CLASS, INTERFACE, ENUM, RECORD)
+        val CLASS_TYPE = listOf(CLASS, INTERFACE, ENUM, RECORD)
     }
 
     override fun equals(other: Any?): Boolean {

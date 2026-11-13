@@ -16,7 +16,7 @@ open class JavaLexer {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val name = "JavaTest.java"
+            val name = "SimplerJavaTest.java"
             val input = Path("").absolute().parent.resolve("compilation_util").resolve("tests").resolve(name).readText()
             val tokens = JavaLexer().process(input)
             tokens.forEach { println(it) }
