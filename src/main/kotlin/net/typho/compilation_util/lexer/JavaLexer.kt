@@ -22,7 +22,9 @@ open class JavaLexer {
             tokens.forEach { println(it) }
 
             println()
-            JavaParser.parse(tokens)
+            val file = JavaParser.parse(tokens)
+            println()
+            println(file)
         }
     }
 

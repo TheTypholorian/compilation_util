@@ -3,7 +3,7 @@ package net.typho.compilation_util.lexer
 interface KeywordType {
     companion object {
         @JvmField
-        val all: Map<String, KeywordType> = (Access.entries + Modifier.entries + Primitive.entries + SelfReference.entries + HeaderValue.entries + Operation.entries + ClassType.entries + ClassModifier.entries).associateBy { it.id }
+        val all: Map<String, KeywordType> = (Access.entries + Modifier.entries + Primitive.entries + SelfReference.entries + HeaderValue.entries + Operation.entries + ClassType.entries + ClassParentType.entries).associateBy { it.id }
     }
 
     val id: String
@@ -91,7 +91,7 @@ interface KeywordType {
         override val id = name.lowercase()
     }
 
-    enum class ClassModifier : KeywordType {
+    enum class ClassParentType : KeywordType {
         EXTENDS,
         IMPLEMENTS;
 
