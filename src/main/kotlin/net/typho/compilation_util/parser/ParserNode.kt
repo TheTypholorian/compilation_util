@@ -8,6 +8,14 @@ sealed class ParserNode {
 
     override fun toString(): String {
         return buildString {
+            if (this@ParserNode is WithAnnotations) {
+                for (annotation in annotations) {
+                    append('@')
+                    append(annotation.fieldsToString())
+                    append(' ')
+                }
+            }
+
             if (this@ParserNode is WithAccess) {
                 if (this@ParserNode !is Initializer) {
                     append(access?.type?.id ?: "package-private")
@@ -24,16 +32,11 @@ sealed class ParserNode {
             append('(')
             append(fieldsToString())
             append(')')
-
-            if (this@ParserNode is Container && children.isNotEmpty()) {
-                append('\n')
-                append(children.joinToString("\n").prependIndent("  "))
-            }
         }
     }
 
-    sealed interface Container {
-        val children: MutableList<out ParserNode>
+    sealed interface WithAnnotations {
+        val annotations: MutableList<Annotation>
     }
 
     sealed class WithAccess : ParserNode() {
@@ -41,23 +44,39 @@ sealed class ParserNode {
         abstract val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>
     }
 
-    sealed class Attribute : WithAccess(), Container
+    sealed class Attribute : WithAccess()
+
+    class Path(
+        @JvmField
+        val tokens: MutableList<LexerToken>
+    ) : ParserNode() {
+        val path: String
+            get() = tokens.joinToString(separator = "") { it.text.toString() }
+
+        override fun fieldsToString(): String {
+            return path
+        }
+    }
 
     class File(
         @JvmField
+        var pkg: Path?,
+        @JvmField
+        val imports: MutableList<Path>,
+        @JvmField
         val classes: MutableList<Class>
     ) : ParserNode() {
-        override fun fieldsToString() = classes.toString()
+        override fun fieldsToString() = "package ${pkg?.path}, imports ${imports.map { it.path }}, $classes"
     }
 
     class Type(
-        // TODO annotation
+        // TODO annotations
         @JvmField
-        var token: LexerToken
+        var path: Path
         // TODO type arguments
     ) : ParserNode() {
         override fun fieldsToString(): String {
-            return token.text.toString()
+            return path.fieldsToString()
         }
 
         override fun toString(): String {
@@ -76,27 +95,32 @@ sealed class ParserNode {
         }
     }
 
-    class Number(
+    class Annotation(
         @JvmField
-        var number: LexerToken.Number
+        var type: Type,
+        @JvmField
+        val values: MutableList<AnnotationValue>
     ) : ParserNode() {
         override fun fieldsToString(): String {
-            return number.text.toString()
+            return "${type.fieldsToString()}(${values.joinToString()})"
         }
     }
 
-    class Text(
+    class AnnotationValue(
         @JvmField
-        var text: LexerToken.Text
+        var key: LexerToken.Identifier,
+        @JvmField
+        var value: LexerToken
     ) : ParserNode() {
         override fun fieldsToString(): String {
-            return text.text.toString()
+            return "${key.text} = ${value.text}"
         }
     }
 
     class Class(
         override var access: LexerToken.Keyword<KeywordType.Access>?,
         override val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>,
+        override val annotations: MutableList<Annotation>,
         // TODO type arguments
         @JvmField
         var classType: LexerToken.Keyword<KeywordType.ClassType>,
@@ -106,32 +130,52 @@ sealed class ParserNode {
         var superClass: Type?,
         @JvmField
         val interfaces: MutableList<Type>,
-        override val children: MutableList<Attribute>
-    ) : Attribute(), Container {
+        @JvmField
+        val attributes: MutableList<Attribute>
+    ) : Attribute(), WithAnnotations {
         override fun fieldsToString(): String {
             return "${classType.text} ${name.text} extends $superClass implements $interfaces"
         }
+
+        override fun toString(): String {
+            return if (attributes.isEmpty()) {
+                super.toString()
+            } else {
+                super.toString() + "\n" + attributes.joinToString("\n").prependIndent("  ") + "\n"
+            }
+        }
     }
 
-    sealed class MethodLike : Attribute(), Container {
+    sealed class Callable : Attribute(), WithAnnotations {
         abstract val arguments: MutableList<Argument>
+        abstract val body: MutableList<LexerToken>?
+
+        override fun toString(): String {
+            return if (body.isNullOrEmpty()) {
+                super.toString()
+            } else {
+                super.toString() + "\n" + body!!.joinToString(" ") { it.text }.prependIndent("  ")
+            }
+        }
     }
 
     class Constructor(
         override var access: LexerToken.Keyword<KeywordType.Access>?,
         override val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>,
+        override val annotations: MutableList<Annotation>,
         override val arguments: MutableList<Argument>,
-        override val children: MutableList<ParserNode>
-    ) : MethodLike() {
+        override val body: MutableList<LexerToken>
+    ) : Callable() {
         override fun fieldsToString(): String {
-            return arguments.joinToString()
+            return arguments.joinToString { it.fieldsToString() }
         }
     }
 
     class Initializer(
         override val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>,
-        override val children: MutableList<ParserNode>
-    ) : Attribute(), Container {
+        @JvmField
+        val body: MutableList<LexerToken>
+    ) : Attribute() {
         override var access: LexerToken.Keyword<KeywordType.Access>?
             get() = null
             set(value) {
@@ -141,38 +185,53 @@ sealed class ParserNode {
         override fun fieldsToString(): String {
             return ""
         }
+
+        override fun toString(): String {
+            return if (body.isEmpty()) {
+                super.toString()
+            } else {
+                super.toString() + "\n" + body.joinToString(" ") { it.text }.prependIndent("  ")
+            }
+        }
     }
 
     class Method(
         override var access: LexerToken.Keyword<KeywordType.Access>?,
         override val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>,
+        override val annotations: MutableList<Annotation>,
         @JvmField
         var returnType: Type,
         override val arguments: MutableList<Argument>,
         @JvmField
         val name: LexerToken.Identifier,
-        @JvmField
-        var hasBody: Boolean,
-        override val children: MutableList<ParserNode>
-    ) : MethodLike() {
+        override val body: MutableList<LexerToken>?
+    ) : Callable() {
         override fun fieldsToString(): String {
-            return "$returnType ${name.text}(${arguments.joinToString()})"
+            return "$returnType ${name.text}(${arguments.joinToString { it.fieldsToString() }})"
         }
     }
 
     class Field(
         override var access: LexerToken.Keyword<KeywordType.Access>?,
         override val modifiers: MutableList<LexerToken.Keyword<KeywordType.Modifier>>,
+        override val annotations: MutableList<Annotation>,
         @JvmField
         var type: Type,
         @JvmField
         val name: LexerToken.Identifier,
         @JvmField
-        var isInitialized: Boolean,
-        override val children: MutableList<ParserNode>
-    ) : Attribute(), Container {
+        val initializer: MutableList<LexerToken>?
+    ) : Attribute(), WithAnnotations {
         override fun fieldsToString(): String {
             return "$type ${name.text}"
+        }
+
+        override fun toString(): String {
+            return if (initializer.isNullOrEmpty()) {
+                super.toString()
+            } else {
+                super.toString() + "\n" + initializer.joinToString("\n").prependIndent("  ")
+            }
         }
     }
 }

@@ -4,7 +4,7 @@ sealed class LexerToken(
     @JvmField
     val text: StringRange
 ) {
-    abstract fun copyWithOffset(offset: Int): LexerToken
+    abstract fun copyWithOffset(offset: Int, text: CharSequence = this.text.text): LexerToken
 
     override fun toString(): String {
         return "${javaClass.simpleName} at ${text.rangeAsLineColumn()}: $text"
@@ -13,7 +13,7 @@ sealed class LexerToken(
     class Identifier(
         range: StringRange
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Identifier(range = text.offset(offset))
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Identifier(range = this.text.offset(offset, text))
     }
 
     class Text(
@@ -23,8 +23,8 @@ sealed class LexerToken(
         @JvmField
         val quoteType: String
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Text(
-            text.offset(offset),
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Text(
+            this.text.offset(offset, text),
             contentsRange.offset(offset),
             quoteType
         )
@@ -37,8 +37,8 @@ sealed class LexerToken(
         @JvmField
         val inline: Boolean
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Comment(
-            text.offset(offset),
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Comment(
+            this.text.offset(offset, text),
             contentsRange.offset(offset),
             inline
         )
@@ -47,8 +47,8 @@ sealed class LexerToken(
     class Number(
         range: StringRange
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Number(
-            text.offset(offset)
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Number(
+            this.text.offset(offset, text)
         )
     }
 
@@ -57,19 +57,19 @@ sealed class LexerToken(
         @JvmField
         val type: T
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Keyword(
-            text.offset(offset),
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Keyword(
+            this.text.offset(offset, text),
             type
         )
     }
 
     class Punctuation(
-        text: String,
+        text: CharSequence,
         @JvmField
         val index: Int
     ) : LexerToken(StringRange(text, index..index + 1)) {
-        override fun copyWithOffset(offset: Int) = Punctuation(
-            text.text,
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Punctuation(
+            text,
             index + offset
         )
         val char: Char
@@ -98,8 +98,8 @@ sealed class LexerToken(
         @JvmField
         val message: String
     ) : LexerToken(range) {
-        override fun copyWithOffset(offset: Int) = Error(
-            text.offset(offset),
+        override fun copyWithOffset(offset: Int, text: CharSequence) = Error(
+            this.text.offset(offset, text),
             message
         )
 

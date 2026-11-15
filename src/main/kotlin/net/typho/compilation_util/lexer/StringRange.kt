@@ -2,11 +2,11 @@ package net.typho.compilation_util.lexer
 
 import net.typho.parsing_util.error.DataReadException
 
-fun String.range(range: IntRange) = StringRange(this, range)
+operator fun CharSequence.get(range: IntRange) = StringRange(this, range)
 
 class StringRange(
     @JvmField
-    val text: String,
+    val text: CharSequence,
     @JvmField
 	val range: IntRange
 ) : CharSequence {
@@ -32,11 +32,15 @@ class StringRange(
         return StringRange(this@StringRange.text, (range.first + startIndex)..(range.first + endIndex))
     }
 
-    fun offset(offset: Int) = StringRange(this@StringRange.text, (range.first + offset)..(range.last + offset))
+    @JvmOverloads
+    fun offset(offset: Int, text: CharSequence = this@StringRange.text) = StringRange(text, (range.first + offset)..(range.last + offset))
+
+    operator fun get(range: IntRange) {
+    }
 
     override fun toString(): String {
         return text.substring(range.first, range.last)
     }
 
-    fun rangeAsLineColumn() = DataReadException.lineAndColumn(text, range.first)
+    fun rangeAsLineColumn() = DataReadException.lineAndColumn(text.toString(), range.first)
 }
