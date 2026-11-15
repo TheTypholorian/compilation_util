@@ -2,12 +2,10 @@ package net.typho.compilation_util.lexer
 
 import net.typho.compilation_util.parser.JavaParser
 import net.typho.parsing_util.StringParsingIterator
-import javax.swing.event.DocumentEvent
+import net.typho.parsing_util.get
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
 import kotlin.io.path.readText
-import kotlin.math.max
-import kotlin.math.min
 
 open class JavaLexer {
     companion object {
@@ -18,74 +16,18 @@ open class JavaLexer {
         fun main(args: Array<String>) {
             val name = "JavaTest.java"
             val input = Path("").absolute().parent.resolve("compilation_util").resolve("tests").resolve(name).readText()
-            val tokens = JavaLexer().process(input)
-            tokens.forEach { println(it) }
 
-            println()
+            val tokens = JavaLexer().process(input)
             val file = JavaParser.parse(tokens)
+
+            tokens.forEach { println(it) }
             println()
             println(file)
         }
     }
 
-    /**
-     * No tokens will ever overlap, but they will not be snug.
-     */
-    @JvmField
-    val tokens = mutableListOf<LexerToken>() // TODO turn into inline linked list
-
-    data class UpdateResult(
-        @JvmField
-        val range: IntRange,
-        @JvmField
-        val newTokensInRange: List<LexerToken>
-    )
-
-    fun update(change: DocumentEvent): UpdateResult? {
-        val offset = when (change.type) {
-            DocumentEvent.EventType.INSERT -> change.length
-            DocumentEvent.EventType.REMOVE -> -change.length
-            else -> return null
-        }
-
-        val changeRange = change.offset..(change.offset + change.length)
-
-        val firstTokenIndex = tokens.indexOfFirst { it.text.range.last >= changeRange.first }
-        val lastTokenIndex = tokens.indexOfLast { it.text.range.first <= changeRange.last }
-
-        if (firstTokenIndex == -1 || lastTokenIndex == -1) {
-            return null
-        }
-
-        for (i in (lastTokenIndex + 1) until tokens.size) {
-            tokens[i] = tokens[i].copyWithOffset(offset)
-        }
-
-        val subList = tokens.subList(firstTokenIndex, lastTokenIndex + 1)
-
-        val range = if (offset > 0) {
-            if (subList.isEmpty()) {
-                changeRange
-            } else {
-                min(subList.first().text.range.first, changeRange.first)..max(subList.last().text.range.last + offset, changeRange.last)
-            }
-        } else {
-            if (subList.isEmpty()) {
-                return null
-            }
-
-            min(subList.first().text.range.first, changeRange.first)..min(subList.last().text.range.last, changeRange.last + offset)
-        }
-        subList.clear()
-        process(change.document.getText(range.first, range.last - range.first), subList)
-
-        subList.replaceAll { it.copyWithOffset(range.first) }
-
-        return UpdateResult(range, subList)
-    }
-
     @JvmOverloads
-    fun process(input: String, output: MutableList<LexerToken> = this.tokens.also { it.clear() }): List<LexerToken> {
+    fun process(input: CharSequence, output: MutableList<LexerToken> = mutableListOf()): List<LexerToken> {
         val input = StringParsingIterator(input)
 
         while (input.hasNext()) {
@@ -139,7 +81,7 @@ open class JavaLexer {
             val keyword = keywordFork.takeUntilOrEnd { index, char -> char.isWhitespace() }
             val keywordEnd = keywordFork.index
 
-            Keyword[keyword]?.let {
+            Keyword[keyword.toString()]?.let {
                 output.add(LexerToken.Keyword(input.text[keywordStart..keywordEnd], it))
                 keywordFork.merge()
                 continue

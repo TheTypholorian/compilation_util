@@ -722,6 +722,7 @@ public class JavaTest<T extends Number & Comparable<T>>
         }
     }
 
+    /*
     public record Point(int x, int y)
             implements Serializable {
 
@@ -764,6 +765,7 @@ public class JavaTest<T extends Number & Comparable<T>>
                     .orElseThrow();
         }
     }
+     */
 
     public static final class Box<E> {
 

@@ -161,16 +161,20 @@ abstract class ParserNode {
         open val values: MutableList<AnnotationValue>
     ) : ParserNode(), WithType {
         override fun fieldsToString(): String {
-            return "${type.fieldsToString()}(${values.joinToString()})"
+            return "${type.fieldsToString()}(${values.joinToString() { it.fieldsToString() }})"
         }
     }
 
     open class AnnotationValue(
-        open var key: LexerToken.Identifier,
-        open var value: LexerToken
-    ) : ParserNode() {
+        open var key: LexerToken.Identifier?,
+        override val body: MutableList<LexerToken>
+    ) : ParserNode(), WithBody {
         override fun fieldsToString(): String {
-            return "${key.text} = ${value.text}"
+            return if (key == null) {
+                body.joinToString(separator = " ") { it.text }
+            } else {
+                "${key!!.text} = ${body.joinToString(separator = " ") { it.text }}"
+            }
         }
     }
 

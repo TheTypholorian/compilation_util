@@ -1,8 +1,10 @@
 package net.typho.compilation_util.lexer
 
+import net.typho.parsing_util.StringView
+
 sealed class LexerToken(
     @JvmField
-    val text: StringRange
+    val text: StringView
 ) {
     abstract fun copyWithOffset(offset: Int, text: CharSequence = this.text.text): LexerToken
 
@@ -11,15 +13,15 @@ sealed class LexerToken(
     }
 
     class Identifier(
-        range: StringRange
+        range: StringView
     ) : LexerToken(range) {
         override fun copyWithOffset(offset: Int, text: CharSequence) = Identifier(range = this.text.offset(offset, text))
     }
 
     class Text(
-        range: StringRange,
+        range: StringView,
         @JvmField
-        val contentsRange: StringRange,
+        val contentsRange: StringView,
         @JvmField
         val quoteType: String
     ) : LexerToken(range) {
@@ -31,9 +33,9 @@ sealed class LexerToken(
     }
 
     class Comment(
-        range: StringRange,
+        range: StringView,
         @JvmField
-        val contentsRange: StringRange,
+        val contentsRange: StringView,
         @JvmField
         val inline: Boolean
     ) : LexerToken(range) {
@@ -45,7 +47,7 @@ sealed class LexerToken(
     }
 
     class Number(
-        range: StringRange
+        range: StringView
     ) : LexerToken(range) {
         override fun copyWithOffset(offset: Int, text: CharSequence) = Number(
             this.text.offset(offset, text)
@@ -53,7 +55,7 @@ sealed class LexerToken(
     }
 
     class Keyword(
-        range: StringRange,
+        range: StringView,
         @JvmField
         val type: net.typho.compilation_util.lexer.Keyword
     ) : LexerToken(range) {
@@ -67,7 +69,7 @@ sealed class LexerToken(
         text: CharSequence,
         @JvmField
         val index: Int
-    ) : LexerToken(StringRange(text, index..index + 1)) {
+    ) : LexerToken(StringView(text, index..index + 1)) {
         override fun copyWithOffset(offset: Int, text: CharSequence) = Punctuation(
             text,
             index + offset
@@ -94,7 +96,7 @@ sealed class LexerToken(
     }
 
     class Error(
-        range: StringRange,
+        range: StringView,
         @JvmField
         val message: String
     ) : LexerToken(range) {

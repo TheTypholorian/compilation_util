@@ -111,25 +111,21 @@ object JavaParser {
                     val iterator = ParsingIterator(iterator.nextUntilOrEndConsideringBrackets(',', "type argument"))
                     var relativity: LexerToken.Keyword? = null
 
-                    while (iterator.hasNext()) {
-                        when (val token = iterator.peek()) {
-                            is LexerToken.Punctuation -> when (token.char) {
-                                '?' -> {
-                                    iterator.next()
-                                    relativity = iterator.next() as LexerToken.Keyword
-                                }
-                                else -> throw DataReadException(token.char.toString())
-                            }
-                            else -> {
-                                val type = readType(iterator, readAnnotations = true, readTypeArguments = true)
+                    if ((iterator.peek() as? LexerToken.Punctuation)?.char == '?') {
+                        iterator.next()
+                        relativity = iterator.next() as LexerToken.Keyword
+                    }
 
-                                if (iterator.hasNext()) {
-                                    throw DataReadException()
-                                }
+                    val type = readType(iterator, readAnnotations = true, readTypeArguments = true)
 
-                                typeArguments.add(ParserNode.TypeArgumentValue(type, relativity))
-                            }
-                        }
+                    if (iterator.hasNext()) {
+                        throw DataReadException()
+                    }
+
+                    typeArguments.add(ParserNode.TypeArgumentValue(type, relativity))
+
+                    if (iterator.hasNext()) {
+                        throw DataReadException()
                     }
                 }
             }
@@ -240,7 +236,7 @@ object JavaParser {
                 access,
                 modifiers,
                 annotations,
-                attributeType as LexerToken.Keyword,
+                attributeType,
                 iterator.next() as LexerToken.Identifier,
                 typeArguments,
                 null,
@@ -433,8 +429,15 @@ object JavaParser {
 
         if (open is LexerToken.Punctuation && open.char == '(') {
             iterator.next()
-            val value = ParsingIterator(iterator.readBrackets('(', ')', "annotation value"))
-            // TODO
+            var key: LexerToken.Identifier? = null
+            var value = iterator.readBrackets('(', ')', "annotation value")
+
+            if (value.size >= 2 && value.first() is LexerToken.Identifier && (value[1] as? LexerToken.Punctuation)?.char == '=') {
+                key = value.first() as LexerToken.Identifier
+                value = value.subList(2, value.size)
+            }
+
+            anno.values.add(ParserNode.AnnotationValue(key, value.toMutableList()))
         }
 
         return anno
