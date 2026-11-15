@@ -41,7 +41,7 @@ public class JavaTest<T extends Number & Comparable<T>>
         }
     }
 
-    public JavaTest() {
+    public JavaTest() throws UnsupportedOperationException {
         this(/* or even a comment here? */new HashMap<>());
     }
 

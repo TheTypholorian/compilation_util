@@ -52,10 +52,10 @@ sealed class LexerToken(
         )
     }
 
-    class Keyword<T : KeywordType>(
+    class Keyword(
         range: StringRange,
         @JvmField
-        val type: T
+        val type: net.typho.compilation_util.lexer.Keyword
     ) : LexerToken(range) {
         override fun copyWithOffset(offset: Int, text: CharSequence) = Keyword(
             this.text.offset(offset, text),

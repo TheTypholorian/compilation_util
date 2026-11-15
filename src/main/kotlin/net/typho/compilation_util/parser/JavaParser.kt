@@ -1,6 +1,6 @@
 package net.typho.compilation_util.parser
 
-import net.typho.compilation_util.lexer.KeywordType
+import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
 import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
@@ -21,12 +21,156 @@ object JavaParser {
         } ?: throw DataReadException("Unterminated $name")
     }
 
+    private fun <V> ParsingIterator<V>.nextUntilOrEndConsideringBrackets(char: Char, name: String): List<V> {
+        var depth = 0
+        return nextUntilOrEnd { index, value ->
+            if (value is LexerToken.Punctuation) {
+                when (value.char) {
+                    '{', '[', '(', '<' -> depth++
+                    '}', ']', ')', '>' -> depth--
+                    char -> if (depth == 0) {
+                        return@nextUntilOrEnd true
+                    }
+                }
+
+                if (depth < 0) {
+                    throw DataReadException("Unterminated $name")
+                }
+            }
+
+            false
+        }
+    }
+
     @JvmStatic
     fun readArgumentListDeclaration(iterator: ParsingIterator<LexerToken>, list: MutableList<ParserNode.Argument> = mutableListOf()): MutableList<ParserNode.Argument> {
         while (iterator.hasNext()) {
-            val arg = iterator.nextUntilOrEnd { index, value -> (value as? LexerToken.Punctuation)?.char == ',' }
-            val name = arg.last() as LexerToken.Identifier
-            list.add(ParserNode.Argument(ParserNode.Type(ParserNode.Path(arg.subList(0, arg.size - 1).toMutableList())), name))
+            val arg = iterator.nextUntilOrEndConsideringBrackets(',', "argument list")
+            val name = arg.last()
+
+            if (name !is LexerToken.Identifier) {
+                throw DataReadException(arg.toString())
+            }
+
+            val type = readType(ParsingIterator(arg, 0 until (arg.size - 1)), readAnnotations = true, readTypeArguments = true)
+            list.add(ParserNode.Argument(type, name))
+        }
+
+        return list
+    }
+
+    @JvmStatic
+    fun readType(iterator: ParsingIterator<LexerToken>, readAnnotations: Boolean, readTypeArguments: Boolean): ParserNode.Type {
+        val annotations = mutableListOf<ParserNode.Annotation>()
+        val path = mutableListOf<LexerToken>()
+        val typeArguments = mutableListOf<ParserNode.TypeArgumentValue>()
+
+        if (readAnnotations) {
+            while (true) {
+                val token = iterator.peek()
+
+                if ((token as? LexerToken.Punctuation)?.char != '@') {
+                    break
+                }
+
+                iterator.next()
+                annotations.add(readAnnotation(iterator))
+            }
+        }
+
+        while (true) {
+            val token = iterator.peek()
+
+            if (token is LexerToken.Keyword && token.type in Keyword.primitives) {
+                path.add(token)
+                iterator.next()
+                break
+            }
+
+            if (token !is LexerToken.Identifier) {
+                break
+            }
+
+            iterator.next()
+            path.add(token)
+
+            if ((iterator.peekOrNull() as? LexerToken.Punctuation)?.char != '.') {
+                break
+            }
+
+            iterator.next()
+        }
+
+        if (readTypeArguments) {
+            if ((iterator.peekOrNull() as? LexerToken.Punctuation)?.char == '<') {
+                iterator.next()
+
+                val iterator = ParsingIterator(iterator.readBrackets('<', '>', "type argument list"))
+
+                while (iterator.hasNext()) {
+                    val iterator = ParsingIterator(iterator.nextUntilOrEndConsideringBrackets(',', "type argument"))
+                    var relativity: LexerToken.Keyword? = null
+
+                    while (iterator.hasNext()) {
+                        when (val token = iterator.peek()) {
+                            is LexerToken.Punctuation -> when (token.char) {
+                                '?' -> {
+                                    iterator.next()
+                                    relativity = iterator.next() as LexerToken.Keyword
+                                }
+                                else -> throw DataReadException(token.char.toString())
+                            }
+                            else -> {
+                                val type = readType(iterator, readAnnotations = true, readTypeArguments = true)
+
+                                if (iterator.hasNext()) {
+                                    throw DataReadException()
+                                }
+
+                                typeArguments.add(ParserNode.TypeArgumentValue(type, relativity))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return ParserNode.Type(annotations, ParserNode.Path(path), typeArguments)
+    }
+
+    @JvmStatic
+    fun readTypeArgumentListDeclaration(iterator: ParsingIterator<LexerToken>, list: MutableList<ParserNode.TypeArgument> = mutableListOf()): MutableList<ParserNode.TypeArgument> {
+        while (iterator.hasNext()) {
+            val iterator = ParsingIterator(iterator.nextUntilOrEndConsideringBrackets(',', "type argument"))
+            val argument = ParserNode.TypeArgument(iterator.next() as LexerToken.Identifier, mutableListOf())
+
+            if (iterator.hasNext()) {
+                when (val token = iterator.next()) {
+                    is LexerToken.Keyword -> when (token.type) {
+                        Keyword.EXTENDS -> {
+                            while (iterator.hasNext()) {
+                                argument.parents.add(readType(iterator, readAnnotations = true, readTypeArguments = true))
+
+                                if (iterator.hasNext()) {
+                                    val token = iterator.next()
+
+                                    if ((token as? LexerToken.Punctuation)?.char != '&') {
+                                        throw DataReadException(token.toString())
+                                    }
+
+                                    if (!iterator.hasNext()) {
+                                        throw DataReadException()
+                                    }
+                                }
+                            }
+                        }
+                        else -> throw DataReadException(token.type.toString())
+                    }
+                    else -> throw DataReadException(token.toString())
+                }
+            }
+
+            list.add(argument)
         }
 
         return list
@@ -34,8 +178,8 @@ object JavaParser {
 
     @JvmStatic
     fun readAttribute(iterator: ParsingIterator<LexerToken>): ParserNode.Attribute {
-        var access: LexerToken.Keyword<KeywordType.Access>? = null
-        val modifiers = mutableListOf<LexerToken.Keyword<KeywordType.Modifier>>()
+        var access: LexerToken.Keyword? = null
+        val modifiers = mutableListOf<LexerToken.Keyword>()
         val annotations = mutableListOf<ParserNode.Annotation>()
 
         while (true) {
@@ -52,39 +196,55 @@ object JavaParser {
         while (true) {
             val token = iterator.peek()
 
-            if (token !is LexerToken.Keyword<*>) {
+            if (token !is LexerToken.Keyword) {
                 break
             }
 
             when (token.type) {
-                is KeywordType.Access -> access = token as LexerToken.Keyword<KeywordType.Access>
-                is KeywordType.Modifier -> modifiers.add(token as LexerToken.Keyword<KeywordType.Modifier>)
+                in Keyword.access -> access = token
+                in Keyword.modifiers -> modifiers.add(token)
                 else -> break
             }
 
             iterator.next()
         }
 
+        val typeArguments = mutableListOf<ParserNode.TypeArgument>()
         val typeArgumentsOpen = iterator.peek()
+        var earlyTypeArguments = false
 
-        // TODO type parameters are only here for methods, not fields nor classes
         if ((typeArgumentsOpen as? LexerToken.Punctuation)?.char == '<') {
             iterator.next()
-            iterator.readBrackets('<', '>', "type argument list") // TODO
+            readTypeArgumentListDeclaration(ParsingIterator(iterator.readBrackets('<', '>', "type argument list")), typeArguments)
+            earlyTypeArguments = true
         }
 
-        val type = iterator.next()
+        val attributeType = iterator.peek()
 
-        if (type is LexerToken.Punctuation && type.char == '{') {
+        if (attributeType is LexerToken.Punctuation && attributeType.char == '{') {
+            if (typeArguments.isNotEmpty()) {
+                throw DataReadException("Class initializers cannot have type arguments")
+            }
+
+            iterator.next()
+
             return ParserNode.Initializer(modifiers, iterator.readBrackets('{', '}', "method body").toMutableList())
-        } else if (type is LexerToken.Keyword<*> && type.type is KeywordType.ClassType) {
+        } else if (attributeType is LexerToken.Keyword && attributeType.type in Keyword.classTypes) {
+            if (earlyTypeArguments) {
+                throw DataReadException("Type arguments for classes must come after the class name, not before")
+            }
+
+            iterator.next()
+
             val cls = ParserNode.Class(
                 access,
                 modifiers,
                 annotations,
-                type as LexerToken.Keyword<KeywordType.ClassType>,
+                attributeType as LexerToken.Keyword,
                 iterator.next() as LexerToken.Identifier,
+                typeArguments,
                 null,
+                mutableListOf(),
                 mutableListOf(),
                 mutableListOf()
             )
@@ -92,39 +252,50 @@ object JavaParser {
 
             if (typeArgumentsOpen is LexerToken.Punctuation && typeArgumentsOpen.char == '<') {
                 iterator.next()
-                iterator.readBrackets('<', '>', "type argument list") // TODO
+                readTypeArgumentListDeclaration(ParsingIterator(iterator.readBrackets('<', '>', "type argument list")), typeArguments)
             }
 
             val extends = iterator.peek()
 
-            if (extends is LexerToken.Keyword<*> && extends.type == KeywordType.ClassParentType.EXTENDS) {
+            if (extends is LexerToken.Keyword && extends.type == Keyword.EXTENDS) {
                 iterator.next()
-                cls.superClass = ParserNode.Type(ParserNode.Path(mutableListOf(iterator.next() as LexerToken.Identifier))) // TODO
+                cls.superClass = readType(iterator, readAnnotations = true, readTypeArguments = true)
             }
 
             val implements = iterator.peek()
 
-            if (implements is LexerToken.Keyword<*> && implements.type == KeywordType.ClassParentType.IMPLEMENTS) {
+            if (implements is LexerToken.Keyword && implements.type == Keyword.IMPLEMENTS) {
                 iterator.next()
 
                 while (true) {
-                    val name = iterator.peek()
-
-                    if (name !is LexerToken.Identifier) {
-                        break
-                    }
-
-                    iterator.next()
-                    cls.interfaces.add(ParserNode.Type(ParserNode.Path(mutableListOf(name)))) // TODO
+                    cls.interfaces.add(readType(iterator, readAnnotations = true, readTypeArguments = true))
 
                     val next = iterator.peek()
 
                     if (next is LexerToken.Punctuation) {
                         when (next.char) {
-                            '<' -> {
-                                iterator.next()
-                                iterator.readBrackets('<', '>', "type argument list") // TODO
-                            }
+                            ',' -> iterator.next()
+                            '{' -> break
+                            else -> throw DataReadException(next.char.toString())
+                        }
+                    } else {
+                        throw DataReadException(next.toString())
+                    }
+                }
+            }
+
+            val permits = iterator.peek()
+
+            if (permits is LexerToken.Keyword && permits.type == Keyword.PERMITS) {
+                iterator.next()
+
+                while (true) {
+                    cls.permits.add(readType(iterator, readAnnotations = true, readTypeArguments = false))
+
+                    val next = iterator.peek()
+
+                    if (next is LexerToken.Punctuation) {
+                        when (next.char) {
                             ',' -> iterator.next()
                             '{' -> break
                             else -> throw DataReadException(next.char.toString())
@@ -151,64 +322,102 @@ object JavaParser {
 
             return cls
         } else {
-            val typeArgOpen = iterator.peek()
+            if ((attributeType as? LexerToken.Punctuation)?.char == '<') {
+                if (earlyTypeArguments) {
+                    throw DataReadException("Two definitions for type parameters")
+                }
 
-            if ((typeArgOpen is LexerToken.Punctuation) && typeArgOpen.char == '<') {
                 iterator.next()
-                iterator.readBrackets('<', '>', "type argument list") // TODO
+                readTypeArgumentListDeclaration(ParsingIterator(iterator.readBrackets('<', '>', "type argument list")), typeArguments)
             }
 
+            val type = readType(iterator, readAnnotations = true, readTypeArguments = true)
             val name = iterator.peek()
 
             return if (name is LexerToken.Punctuation && name.char == '(') {
                 iterator.next()
-                ParserNode.Constructor(
-                    access,
-                    modifiers,
-                    annotations,
-                    readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list"))),
-                    when (val next = (iterator.peek() as LexerToken.Punctuation).char) {
-                        ';' -> throw DataReadException("Constructor must have body")
-                        '{' -> {
-                            iterator.next()
-                            iterator.readBrackets('{', '}', "method body").toMutableList()
+
+                val arguments = readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list")))
+
+                val exceptions = mutableListOf<ParserNode.Type>()
+                val token = iterator.peek()
+
+                if (token is LexerToken.Keyword && token.type == Keyword.THROWS) {
+                    iterator.next()
+
+                    while (true) {
+                        exceptions.add(readType(iterator, readAnnotations = true, readTypeArguments = true))
+
+                        val next = iterator.peek()
+
+                        if (next is LexerToken.Punctuation) {
+                            when (next.char) {
+                                ',' -> iterator.next()
+                                else -> break
+                            }
+                        } else {
+                            throw DataReadException(next.toString())
                         }
-                        else -> throw DataReadException(next.toString())
                     }
-                )
+                }
+
+                val body = when (val next = (iterator.peek() as LexerToken.Punctuation).char) {
+                    ';' -> throw DataReadException("Constructor must have body")
+                    '{' -> {
+                        iterator.next()
+                        iterator.readBrackets('{', '}', "method body").toMutableList()
+                    }
+                    else -> throw DataReadException(next.toString())
+                }
+
+                ParserNode.Constructor(access, modifiers, annotations, arguments, exceptions, body)
             } else {
                 iterator.next()
-                name as LexerToken.Identifier
-                val type = ParserNode.Type(ParserNode.Path(mutableListOf(type))) // TODO
+                name as? LexerToken.Identifier ?:
+                throw DataReadException(name.toString())
 
                 when (val token = (iterator.next() as LexerToken.Punctuation).char) {
-                    '(' -> ParserNode.Method(
-                        access,
-                        modifiers,
-                        annotations,
-                        type,
-                        readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list"))),
-                        name,
-                        when (val next = (iterator.peek() as LexerToken.Punctuation).char) {
-                            ';' -> null
-                            '{' -> {
-                                iterator.next()
-                                iterator.readBrackets('{', '}', "method body").toMutableList()
+                    '(' -> {
+                        val arguments = readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list")))
+
+                        val exceptions = mutableListOf<ParserNode.Type>()
+                        val token = iterator.peek()
+
+                        if (token is LexerToken.Keyword && token.type == Keyword.THROWS) {
+                            iterator.next()
+
+                            while (true) {
+                                exceptions.add(readType(iterator, readAnnotations = true, readTypeArguments = true))
+
+                                val next = iterator.peek()
+
+                                if (next is LexerToken.Punctuation) {
+                                    when (next.char) {
+                                        ',' -> iterator.next()
+                                        else -> break
+                                    }
+                                } else {
+                                    throw DataReadException(next.toString())
+                                }
                             }
+                        }
+
+                        val body = when (val next = (iterator.next() as LexerToken.Punctuation).char) {
+                            ';' -> null
+                            '{' -> iterator.readBrackets('{', '}', "method body").toMutableList()
                             else -> throw DataReadException(next.toString())
                         }
-                    )
-                    '=' -> ParserNode.Field(
-                        access,
-                        modifiers,
-                        annotations,
-                        type,
-                        name,
-                        (iterator.nextUntil { index, value ->
+
+                        ParserNode.Method(access, modifiers, annotations, typeArguments, type, arguments, name, exceptions, body)
+                    }
+                    '=' -> {
+                        val initializer = (iterator.nextUntil { index, value ->
                             (value as? LexerToken.Punctuation)?.char == ';'
                         } ?: throw DataReadException("Unterminated initializer")).toMutableList()
-                    )
-                    ';' -> ParserNode.Field(access, modifiers, annotations, type, name, null)
+
+                        ParserNode.Field(access, modifiers, annotations, typeArguments, type, name, initializer)
+                    }
+                    ';' -> ParserNode.Field(access, modifiers, annotations, typeArguments, type, name, null)
                     else -> throw DataReadException(token.toString())
                 }
             }
@@ -217,14 +426,14 @@ object JavaParser {
 
     @JvmStatic
     fun readAnnotation(iterator: ParsingIterator<LexerToken>): ParserNode.Annotation {
-        val type = ParserNode.Type(ParserNode.Path(mutableListOf(iterator.next()))) // TODO
+        val type = readType(iterator, readAnnotations = false, readTypeArguments = false)
         val anno = ParserNode.Annotation(type, mutableListOf())
 
         val open = iterator.peek()
 
         if (open is LexerToken.Punctuation && open.char == '(') {
             iterator.next()
-            val body = ParsingIterator(iterator.readBrackets('(', ')', "annotation"))
+            val value = ParsingIterator(iterator.readBrackets('(', ')', "annotation value"))
             // TODO
         }
 
@@ -240,7 +449,7 @@ object JavaParser {
 
         val token = iterator.peek()
 
-        if (token is LexerToken.Keyword<*> && token.type == KeywordType.HeaderValue.PACKAGE) {
+        if (token is LexerToken.Keyword && token.type == Keyword.PACKAGE) {
             iterator.next()
 
             val path = iterator.nextUntil { index, value ->
@@ -252,7 +461,7 @@ object JavaParser {
         while (true) {
             val token = iterator.peek()
 
-            if (token is LexerToken.Keyword<*> && token.type == KeywordType.HeaderValue.IMPORT) {
+            if (token is LexerToken.Keyword && token.type == Keyword.IMPORT) {
                 iterator.next()
 
                 val path = iterator.nextUntil { index, value ->

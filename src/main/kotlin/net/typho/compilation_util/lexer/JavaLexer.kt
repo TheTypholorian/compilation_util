@@ -134,6 +134,17 @@ open class JavaLexer {
                 continue
             }
 
+            val keywordFork = input.fork()
+            val keywordStart = keywordFork.index
+            val keyword = keywordFork.takeUntilOrEnd { index, char -> char.isWhitespace() }
+            val keywordEnd = keywordFork.index
+
+            Keyword[keyword]?.let {
+                output.add(LexerToken.Keyword(input.text[keywordStart..keywordEnd], it))
+                keywordFork.merge()
+                continue
+            }
+
             val fork = input.fork()
             val wordStart = fork.index
             val word = fork.takeUntilOrEnd { index, char -> char.isWhitespace() || char.isJavaPunctuation() }
@@ -144,10 +155,6 @@ open class JavaLexer {
             }
 
             when {
-                word in KeywordType.all -> {
-                    output.add(LexerToken.Keyword(input.text[wordStart..wordEnd], KeywordType.all[word]!!))
-                    fork.merge()
-                }
                 word[0] == '"' || word[0] == '\'' -> {
                     val quote = word[0]
 
