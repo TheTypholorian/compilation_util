@@ -67,9 +67,9 @@ object JavaParser {
 
         if (readAnnotations) {
             while (true) {
-                val token = iterator.peek()
+                val at = iterator.peek()
 
-                if ((token as? LexerToken.Punctuation)?.char != '@') {
+                if ((at as? LexerToken.Punctuation)?.char != '@') {
                     break
                 }
 
@@ -179,9 +179,9 @@ object JavaParser {
         val annotations = mutableListOf<ParserNode.Annotation>()
 
         while (true) {
-            val token = iterator.peek()
+            val at = iterator.peek()
 
-            if ((token as? LexerToken.Punctuation)?.char == '@') {
+            if ((at as? LexerToken.Punctuation)?.char == '@') {
                 iterator.next()
                 annotations.add(readAnnotation(iterator))
             } else {

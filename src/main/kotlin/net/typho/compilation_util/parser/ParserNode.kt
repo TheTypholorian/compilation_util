@@ -1,5 +1,6 @@
 package net.typho.compilation_util.parser
 
+import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
 
 abstract class ParserNode {
