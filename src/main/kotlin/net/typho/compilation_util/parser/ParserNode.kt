@@ -1,6 +1,5 @@
 package net.typho.compilation_util.parser
 
-import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
 
 abstract class ParserNode {
@@ -260,11 +259,10 @@ abstract class ParserNode {
         override var access: LexerToken.Keyword?,
         override val modifiers: MutableList<LexerToken.Keyword>,
         override val annotations: MutableList<Annotation>,
-        override val typeArguments: MutableList<TypeArgument>,
         override var type: Type,
         override var name: LexerToken.Identifier,
         open val initializer: MutableList<LexerToken>?
-    ) : Attribute(), WithAnnotations, WithTypeArguments, WithName, WithType {
+    ) : Attribute(), WithAnnotations, WithName, WithType {
         override fun fieldsToString(): String {
             return "$type ${name.text}"
         }

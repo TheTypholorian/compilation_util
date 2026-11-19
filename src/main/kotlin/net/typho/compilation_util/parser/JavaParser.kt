@@ -320,7 +320,7 @@ object JavaParser {
         } else {
             if ((attributeType as? LexerToken.Punctuation)?.char == '<') {
                 if (earlyTypeArguments) {
-                    throw DataReadException("Two definitions for type parameters")
+                    throw DataReadException("Two definitions for type arguments")
                 }
 
                 iterator.next()
@@ -331,6 +331,10 @@ object JavaParser {
             val name = iterator.peek()
 
             return if (name is LexerToken.Punctuation && name.char == '(') {
+                if (typeArguments.isNotEmpty()) {
+                    throw DataReadException("Constructors do not have type arguments")
+                }
+
                 iterator.next()
 
                 val arguments = readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list")))
@@ -369,8 +373,7 @@ object JavaParser {
                 ParserNode.Constructor(access, modifiers, annotations, arguments, exceptions, body)
             } else {
                 iterator.next()
-                name as? LexerToken.Identifier ?:
-                throw DataReadException(name.toString())
+                name as? LexerToken.Identifier ?: throw DataReadException(name.toString())
 
                 when (val token = (iterator.next() as LexerToken.Punctuation).char) {
                     '(' -> {
@@ -407,13 +410,23 @@ object JavaParser {
                         ParserNode.Method(access, modifiers, annotations, typeArguments, type, arguments, name, exceptions, body)
                     }
                     '=' -> {
+                        if (typeArguments.isNotEmpty()) {
+                            throw DataReadException("Fields do not have type arguments")
+                        }
+
                         val initializer = (iterator.nextUntil { index, value ->
                             (value as? LexerToken.Punctuation)?.char == ';'
                         } ?: throw DataReadException("Unterminated initializer")).toMutableList()
 
-                        ParserNode.Field(access, modifiers, annotations, typeArguments, type, name, initializer)
+                        ParserNode.Field(access, modifiers, annotations, type, name, initializer)
                     }
-                    ';' -> ParserNode.Field(access, modifiers, annotations, typeArguments, type, name, null)
+                    ';' -> {
+                        if (typeArguments.isNotEmpty()) {
+                            throw DataReadException("Fields do not have type arguments")
+                        }
+
+                        ParserNode.Field(access, modifiers, annotations, type, name, null)
+                    }
                     else -> throw DataReadException(token.toString())
                 }
             }
