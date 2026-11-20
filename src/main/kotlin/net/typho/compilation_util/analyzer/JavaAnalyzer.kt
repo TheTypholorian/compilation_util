@@ -1,5 +1,6 @@
 package net.typho.compilation_util.analyzer
 
+import net.typho.compilation_util.analyzer.lookup.ClassLookup
 import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
 import net.typho.compilation_util.parser.ParserNode
@@ -9,17 +10,17 @@ import org.objectweb.asm.Opcodes
 
 object JavaAnalyzer {
     @JvmStatic
-    fun analyze(file: ParserNode.File) {
+    fun analyze(file: ParserNode.File, lookup: ClassLookup.Supplier) {
         val pkg = file.pkg?.let { analyzePath(it) }
         val imports = file.imports.map { analyzePath(it) }
 
         for (cls in file.classes) {
-            analyzeClass(pkg, imports, cls)
+            analyzeClass(pkg, imports, cls, lookup.create(imports))
         }
     }
 
     @JvmStatic
-    fun analyzeClass(pkg: AnalyzeNode.Path?, imports: List<AnalyzeNode.Path>, cls: ParserNode.Class) {
+    fun analyzeClass(pkg: AnalyzeNode.Path?, imports: List<AnalyzeNode.Path>, cls: ParserNode.Class, lookup: ClassLookup) {
         val name = pkg + AnalyzeNode.Path(cls.name.text.toString())
 
         println("Class '$name'")
@@ -57,7 +58,8 @@ object JavaAnalyzer {
         println("Access '${classAccess.toString(2)}'")
 
         for (anno in cls.annotations) {
-            //val type = analyzePath()
+            val type = lookup.resolve(analyzePath(anno.type))
+            println("- Annotation with type '$type'")
         }
     }
 

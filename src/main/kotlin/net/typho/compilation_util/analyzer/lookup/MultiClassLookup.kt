@@ -7,4 +7,11 @@ class MultiClassLookup(
     val lookups: List<ClassLookup>
 ) : ClassLookup {
     override fun resolve(path: AnalyzeNode.Path) = lookups.firstNotNullOfOrNull { it.resolve(path) }
+
+    class Supplier(
+        @JvmField
+        val lookups: List<ClassLookup.Supplier>
+    ) : ClassLookup.Supplier {
+        override fun create(imports: List<AnalyzeNode.Path>) = MultiClassLookup(lookups.map { it.create(imports) })
+    }
 }

@@ -26,45 +26,17 @@ interface ClassLookup {
     ) : Supplier {
         protected val jar by lazy { JarFile(file) }
         /**
-         * Map of package name (without the `.*`) to map of package-relative name (will be one token except for subclasses) to their [ClassIndex].
-         */
-        @JvmField
-        protected val packages = mutableMapOf<AnalyzeNode.Path, Map<AnalyzeNode.Path, ClassIndex>>()
-        /**
          * Map of absolute names to their [ClassIndex].
-         * All entries in [packages] will be here as well
          */
         @JvmField
         protected val files = mutableMapOf<AnalyzeNode.Path, ClassIndex?>()
-
-        protected fun getPackage(path: AnalyzeNode.Path): Map<AnalyzeNode.Path, ClassIndex> {
-            packages[path]?.let { return it }
-
-            val filePath = path.path.replace('.', '/') + "/"
-            val map = mutableMapOf<AnalyzeNode.Path, ClassIndex>()
-
-            for (entry in jar.entries().iterator()) {
-                if (!entry.isDirectory) { // skip dirs
-                    if (entry.name.endsWith(".class")) { // only classes
-                        if (entry.name.startsWith(filePath)) { // in package
-                            if (entry.name.indexOf('/', filePath.length) == -1) { // skip nesting
-                                val entryPath = AnalyzeNode.Path(entry.name.removeSuffix(".class").replace('/', '.'))
-                                map[entryPath] = getFile(entryPath)!!
-                            }
-                        }
-                    }
-                }
-            }
-
-            return map.also { packages[path] = it }
-        }
 
         protected fun getFile(path: AnalyzeNode.Path): ClassIndex? {
             if (files.containsKey(path)) {
                 return files[path]
             }
 
-            val entry = jar.getJarEntry("$path.class") ?: return null
+            val entry = jar.getJarEntry("$path.class") ?: return null.also { files[path] = null }
             jar.getInputStream(entry).use { input ->
                 val reader = ClassReader(input)
                 val node = ClassNode()
@@ -87,6 +59,8 @@ interface ClassLookup {
                     return cache[path]
                 }
 
+                val fileName = path.path.replace('.', '/')
+
                 for ((import) in imports) {
                     if (import.last() != '*') {
                         TODO()
@@ -95,9 +69,10 @@ interface ClassLookup {
 
                 for ((import) in imports) {
                     if (import.last() == '*') {
-                        val pkg = AnalyzeNode.Path(import.removeSuffix(".*")) // TODO
-                        getPackage(pkg)[path]?.let {
-                            return it.also { cache[path] = it }
+                        val import = AnalyzeNode.Path(import.removeSuffix("*") /* TODO */ + fileName)
+                        getFile(import)?.let {
+                            cache[path] = it
+                            return it
                         }
                     }
                 }

@@ -1,11 +1,14 @@
 package net.typho.compilation_util.lexer
 
 import net.typho.compilation_util.analyzer.JavaAnalyzer
+import net.typho.compilation_util.analyzer.lookup.ClassLookup
+import net.typho.compilation_util.analyzer.lookup.MultiClassLookup
 import net.typho.compilation_util.parser.JavaParser
 import net.typho.parsing_util.StringParsingIterator
 import net.typho.parsing_util.get
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
+import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.readText
 
 open class JavaLexer {
@@ -26,7 +29,9 @@ open class JavaLexer {
             println(file)
             println()
 
-            JavaAnalyzer.analyze(file)
+            val path = Path("C:\\Users\\evan\\Desktop\\extracted\\jars")
+            val lookup = MultiClassLookup.Supplier(path.listDirectoryEntries().map { ClassLookup.Jar(it.toFile()) })
+            JavaAnalyzer.analyze(file, lookup)
         }
     }
 

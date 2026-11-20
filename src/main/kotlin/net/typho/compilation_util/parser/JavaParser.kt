@@ -442,7 +442,7 @@ object JavaParser {
     @JvmStatic
     fun readAnnotation(iterator: ParsingIterator<LexerToken>): ParserNode.Annotation {
         val type = readType(iterator, readAnnotations = false, readTypeArguments = false)
-        val anno = ParserNode.Annotation(type, mutableListOf())
+        val anno = ParserNode.Annotation(type.path, mutableListOf())
 
         val open = iterator.peek()
 
