@@ -1,6 +1,7 @@
 package net.typho.compilation_util.analyzer.lookup
 
 import net.typho.compilation_util.analyzer.AnalyzeNode
+import net.typho.compilation_util.index.ClassIndex
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import java.io.File
@@ -17,7 +18,7 @@ interface ClassLookup {
     fun resolve(path: AnalyzeNode.Path): ClassIndex?
 
     fun interface Supplier {
-        fun create(imports: List<AnalyzeNode.Path>): ClassLookup
+        fun create(imports: List<AnalyzeNode.Import>): ClassLookup
     }
 
     open class Jar(
@@ -36,7 +37,7 @@ interface ClassLookup {
                 return files[path]
             }
 
-            val entry = jar.getJarEntry("$path.class") ?: return null.also { files[path] = null }
+            val entry = jar.getJarEntry("${path.toString().replace('.', '/')}.class") ?: return null.also { files[path] = null }
             jar.getInputStream(entry).use { input ->
                 val reader = ClassReader(input)
                 val node = ClassNode()
@@ -45,11 +46,11 @@ interface ClassLookup {
             }
         }
 
-        override fun create(imports: List<AnalyzeNode.Path>): ClassLookup = Lookup(imports)
+        override fun create(imports: List<AnalyzeNode.Import>): ClassLookup = Lookup(imports)
 
         protected open inner class Lookup(
             @JvmField
-            protected val imports: List<AnalyzeNode.Path>
+            protected val imports: List<AnalyzeNode.Import>
         ) : ClassLookup {
             @JvmField
             protected val cache = mutableMapOf<AnalyzeNode.Path, ClassIndex?>()
@@ -59,17 +60,28 @@ interface ClassLookup {
                     return cache[path]
                 }
 
-                val fileName = path.path.replace('.', '/')
+                getFile(path)?.let {
+                    cache[path] = it
+                    return it
+                }
 
-                for ((import) in imports) {
-                    if (import.last() != '*') {
-                        TODO()
+                val fileName = path.path.replace('.', '$')
+
+                for ((import, isPackage) in imports) {
+                    if (!isPackage) {
+                        if (import.path.substringAfterLast('.') == path.path.substringBefore('.')) {
+                            val import = import + path.path.substringAfter('.', "")
+                            getFile(import)?.let {
+                                cache[path] = it
+                                return it
+                            }
+                        }
                     }
                 }
 
-                for ((import) in imports) {
-                    if (import.last() == '*') {
-                        val import = AnalyzeNode.Path(import.removeSuffix("*") /* TODO */ + fileName)
+                for ((import, isPackage) in imports) {
+                    if (isPackage) {
+                        val import = import + fileName
                         getFile(import)?.let {
                             cache[path] = it
                             return it

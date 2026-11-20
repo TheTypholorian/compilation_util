@@ -12,6 +12,6 @@ class MultiClassLookup(
         @JvmField
         val lookups: List<ClassLookup.Supplier>
     ) : ClassLookup.Supplier {
-        override fun create(imports: List<AnalyzeNode.Path>) = MultiClassLookup(lookups.map { it.create(imports) })
+        override fun create(imports: List<AnalyzeNode.Import>) = MultiClassLookup(lookups.map { it.create(imports) })
     }
 }

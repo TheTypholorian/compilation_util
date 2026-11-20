@@ -30,7 +30,9 @@ open class JavaLexer {
             println()
 
             val path = Path("C:\\Users\\evan\\Desktop\\extracted\\jars")
-            val lookup = MultiClassLookup.Supplier(path.listDirectoryEntries().map { ClassLookup.Jar(it.toFile()) })
+            val libPath = Path("").absolute().parent.resolve(Path("compilation_util\\test_lib\\build\\libs\\test_lib-1.0.0.jar"))
+            val jars = (path.listDirectoryEntries().plusElement(libPath)).map { ClassLookup.Jar(it.toFile()) }
+            val lookup = MultiClassLookup.Supplier(jars)
             JavaAnalyzer.analyze(file, lookup)
         }
     }
