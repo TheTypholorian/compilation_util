@@ -198,7 +198,13 @@ object JavaParser {
 
             when (token.type) {
                 in Keyword.access -> access = token
-                in Keyword.modifiers -> modifiers.add(token)
+                in Keyword.modifiers -> {
+                    if (modifiers.any { it.type == token.type }) {
+                        throw DataReadException("Duplicate modifier ${token.type}")
+                    } else {
+                        modifiers.add(token)
+                    }
+                }
                 else -> break
             }
 

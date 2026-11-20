@@ -47,18 +47,6 @@ abstract class ParserNode {
         val typeArguments: MutableList<TypeArgument>
     }
 
-    interface WithName {
-        var name: LexerToken.Identifier
-    }
-
-    interface WithBody {
-        val body: MutableList<LexerToken>?
-    }
-
-    interface WithType {
-        var type: Type
-    }
-
     interface WithExceptions {
         val exceptions: MutableList<Type>
     }
@@ -70,7 +58,8 @@ abstract class ParserNode {
 
     abstract class Attribute : WithAccess()
 
-    abstract class Callable : Attribute(), WithAnnotations, WithBody {
+    abstract class Callable : Attribute(), WithAnnotations {
+        abstract val body: MutableList<LexerToken>?
         abstract val arguments: MutableList<Argument>
 
         override fun toString(): String {
@@ -135,9 +124,9 @@ abstract class ParserNode {
     }
 
     open class TypeArgument(
-        override var name: LexerToken.Identifier,
+        open var name: LexerToken.Identifier,
         open val parents: MutableList<Type>
-    ) : ParserNode(), WithName {
+    ) : ParserNode() {
         override fun fieldsToString(): String {
             return if (parents.isEmpty()) {
                 name.text.toString()
@@ -148,18 +137,18 @@ abstract class ParserNode {
     }
 
     open class Argument(
-        override var type: Type,
-        override var name: LexerToken.Identifier
-    ) : ParserNode(), WithName, WithType {
+        open var type: Type,
+        open var name: LexerToken.Identifier
+    ) : ParserNode() {
         override fun fieldsToString(): String {
             return "$type ${name.text}"
         }
     }
 
     open class Annotation(
-        override var type: Type,
+        open var type: Path,
         open val values: MutableList<AnnotationValue>
-    ) : ParserNode(), WithType {
+    ) : ParserNode() {
         override fun fieldsToString(): String {
             return "${type.fieldsToString()}(${values.joinToString() { it.fieldsToString() }})"
         }
@@ -167,8 +156,8 @@ abstract class ParserNode {
 
     open class AnnotationValue(
         open var key: LexerToken.Identifier?,
-        override val body: MutableList<LexerToken>
-    ) : ParserNode(), WithBody {
+        open val body: MutableList<LexerToken>
+    ) : ParserNode() {
         override fun fieldsToString(): String {
             return if (key == null) {
                 body.joinToString(separator = " ") { it.text }
@@ -183,13 +172,13 @@ abstract class ParserNode {
         override val modifiers: MutableList<LexerToken.Keyword>,
         override val annotations: MutableList<Annotation>,
         open var classType: LexerToken.Keyword,
-        override var name: LexerToken.Identifier,
+        open var name: LexerToken.Identifier,
         override val typeArguments: MutableList<TypeArgument>,
         open var superClass: Type?,
         open val interfaces: MutableList<Type>,
         open val permits: MutableList<Type>,
         open val attributes: MutableList<Attribute>
-    ) : Attribute(), WithAnnotations, WithTypeArguments, WithName {
+    ) : Attribute(), WithAnnotations, WithTypeArguments {
         override fun fieldsToString(): String {
             return "${classType.text} ${name.text} extends $superClass implements $interfaces"
         }
@@ -218,8 +207,8 @@ abstract class ParserNode {
 
     open class Initializer(
         override val modifiers: MutableList<LexerToken.Keyword>,
-        override val body: MutableList<LexerToken>
-    ) : Attribute(), WithBody {
+        open val body: MutableList<LexerToken>
+    ) : Attribute() {
         override var access: LexerToken.Keyword?
             get() = null
             set(value) {
@@ -246,10 +235,10 @@ abstract class ParserNode {
         override val typeArguments: MutableList<TypeArgument>,
         open var returnType: Type,
         override val arguments: MutableList<Argument>,
-        override var name: LexerToken.Identifier,
+        open var name: LexerToken.Identifier,
         override val exceptions: MutableList<Type>,
         override val body: MutableList<LexerToken>?
-    ) : Callable(), WithTypeArguments, WithName, WithExceptions {
+    ) : Callable(), WithExceptions, WithTypeArguments {
         override fun fieldsToString(): String {
             return "$returnType ${name.text}(${arguments.joinToString { it.fieldsToString() }})"
         }
@@ -259,10 +248,10 @@ abstract class ParserNode {
         override var access: LexerToken.Keyword?,
         override val modifiers: MutableList<LexerToken.Keyword>,
         override val annotations: MutableList<Annotation>,
-        override var type: Type,
-        override var name: LexerToken.Identifier,
+        open var type: Type,
+        open var name: LexerToken.Identifier,
         open val initializer: MutableList<LexerToken>?
-    ) : Attribute(), WithAnnotations, WithName, WithType {
+    ) : Attribute(), WithAnnotations {
         override fun fieldsToString(): String {
             return "$type ${name.text}"
         }

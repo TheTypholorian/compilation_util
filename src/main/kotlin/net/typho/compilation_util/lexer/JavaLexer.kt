@@ -1,5 +1,6 @@
 package net.typho.compilation_util.lexer
 
+import net.typho.compilation_util.analyzer.JavaAnalyzer
 import net.typho.compilation_util.parser.JavaParser
 import net.typho.parsing_util.StringParsingIterator
 import net.typho.parsing_util.get
@@ -23,6 +24,9 @@ open class JavaLexer {
             tokens.forEach { println(it) }
             println()
             println(file)
+            println()
+
+            JavaAnalyzer.analyze(file)
         }
     }
 
@@ -78,7 +82,7 @@ open class JavaLexer {
 
             val keywordFork = input.fork()
             val keywordStart = keywordFork.index
-            val keyword = keywordFork.takeUntilOrEnd { index, char -> char.isWhitespace() }
+            val keyword = keywordFork.takeUntilOrEnd { index, char -> char.isWhitespace() || (char.isJavaPunctuation() && char != '-') }
             val keywordEnd = keywordFork.index
 
             Keyword[keyword.toString()]?.let {
