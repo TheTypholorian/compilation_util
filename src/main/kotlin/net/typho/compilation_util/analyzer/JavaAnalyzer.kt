@@ -57,7 +57,7 @@ object JavaAnalyzer {
         println("Access '${classAccess.toString(2)}'")
 
         for (anno in cls.annotations) {
-            val type = analyzePath()
+            //val type = analyzePath()
         }
     }
 

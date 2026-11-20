@@ -33,8 +33,9 @@ operator fun AnalyzeNode.Path?.plus(other: String): AnalyzeNode.Path {
 }
 
 abstract class AnalyzeNode {
-    open class Path(
-        open val path: String
+    data class Path(
+        @JvmField
+        val path: String
     ) : AnalyzeNode() {
         constructor(tokens: List<CharSequence>) : this(if (tokens.isEmpty()) throw DataReadException("Empty path") else tokens.joinToString("."))
 
