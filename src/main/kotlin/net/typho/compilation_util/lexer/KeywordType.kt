@@ -1,25 +1,25 @@
 package net.typho.compilation_util.lexer
 
-class Keyword private constructor(
+class KeywordType private constructor(
     @JvmField
     val name: String
 ) {
     companion object {
-        private val all = mutableMapOf<String, Keyword>()
+        private val all = mutableMapOf<String, KeywordType>()
         @JvmField
-        val access = mutableSetOf<Keyword>()
+        val access = mutableSetOf<KeywordType>()
         @JvmField
-        val modifiers = mutableSetOf<Keyword>()
+        val modifiers = mutableSetOf<KeywordType>()
         @JvmField
-        val primitives = mutableSetOf<Keyword>()
+        val primitives = mutableSetOf<KeywordType>()
         @JvmField
-        val classTypes = mutableSetOf<Keyword>()
+        val classTypes = mutableSetOf<KeywordType>()
 
         @JvmStatic
         operator fun get(name: String) = all[name]
 
         @JvmStatic
-        fun create(name: String) = all.computeIfAbsent(name) { Keyword(name) }
+        fun create(name: String) = all.computeIfAbsent(name) { KeywordType(name) }
 
         @JvmField
         val ABSTRACT = create("abstract").also { modifiers.add(it) }

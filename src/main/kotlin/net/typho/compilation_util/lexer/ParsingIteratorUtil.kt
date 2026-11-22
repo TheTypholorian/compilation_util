@@ -3,10 +3,10 @@ package net.typho.compilation_util.lexer
 import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
 
-fun ParsingIterator<LexerToken>.readBrackets(open: Char, close: Char, name: String): List<LexerToken> {
+fun ParsingIterator<JlToken>.readBrackets(open: Char, close: Char, name: String): List<JlToken> {
     var depth = 1
     return nextUntil { index, value ->
-        if (value is LexerToken.Punctuation) {
+        if (value is JlPunctuation) {
             when (value.char) {
                 open -> depth++
                 close -> depth--
@@ -17,10 +17,10 @@ fun ParsingIterator<LexerToken>.readBrackets(open: Char, close: Char, name: Stri
     } ?: throw DataReadException("Unterminated $name")
 }
 
-fun ParsingIterator<LexerToken>.nextUntilOrEndConsideringBrackets(char: Char, name: String): List<LexerToken> {
+fun ParsingIterator<JlToken>.nextUntilOrEndConsideringBrackets(char: Char, name: String): List<JlToken> {
     var depth = 0
     return nextUntilOrEnd { index, value ->
-        if (value is LexerToken.Punctuation) {
+        if (value is JlPunctuation) {
             when (value.char) {
                 '{', '[', '(', '<' -> depth++
                 '}', ']', ')', '>' -> depth--

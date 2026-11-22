@@ -38,7 +38,7 @@ open class JavaLexer {
     }
 
     @JvmOverloads
-    fun process(input: CharSequence, output: MutableList<LexerToken> = mutableListOf()): List<LexerToken> {
+    fun process(input: CharSequence, output: MutableList<JlToken> = mutableListOf()): List<JlToken> {
         val input = StringParsingIterator(input)
 
         while (input.hasNext()) {
@@ -54,7 +54,7 @@ open class JavaLexer {
 
                     val endIndex = input.index
 
-                    output.add(LexerToken.Comment(input.text[startIndex1..endIndex], input.text[startIndex2..endIndex], false))
+                    output.add(JlComment(input.text[startIndex1..endIndex], input.text[startIndex2..endIndex], false))
                 } else if (input.currentMatches("/*")) {
                     val startIndex1 = input.index
                     input.index += 2
@@ -66,9 +66,9 @@ open class JavaLexer {
                     input.index += 2
                     val endIndex1 = input.index
 
-                    output.add(LexerToken.Comment(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], true))
+                    output.add(JlComment(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], true))
                 } else {
-                    output.add(LexerToken.Punctuation(input.text, input.index))
+                    output.add(JlPunctuation(input.text, input.index))
                     input.next()
                 }
 
@@ -82,7 +82,7 @@ open class JavaLexer {
                     !(char.isDigit() || char == 'x' || char == 'p' || char == 'L' || char == '.' || char == '-' || char == '+' || char == '_' || char in 'a'..'f')
                 }
                 val endIndex = input.index
-                output.add(LexerToken.Number(input.text[startIndex..endIndex]))
+                output.add(JlNumber(input.text[startIndex..endIndex]))
 
                 continue
             }
@@ -92,8 +92,8 @@ open class JavaLexer {
             val keyword = keywordFork.takeUntilOrEnd { index, char -> char.isWhitespace() || (char.isJavaPunctuation() && char != '-') }
             val keywordEnd = keywordFork.index
 
-            Keyword[keyword.toString()]?.let {
-                output.add(LexerToken.Keyword(input.text[keywordStart..keywordEnd], it))
+            KeywordType[keyword.toString()]?.let {
+                output.add(JlKeyword(input.text[keywordStart..keywordEnd], it))
                 keywordFork.merge()
                 continue
             }
@@ -127,13 +127,13 @@ open class JavaLexer {
                             } else {
                                 input.currentMatches("\"\"\"")
                             }
-                        } ?: output.add(LexerToken.Error(input.text[startIndex1..input.index], "Unterminated string")).also { break }
+                        } ?: output.add(JlError(input.text[startIndex1..input.index], "Unterminated string")).also { break }
 
                         val endIndex2 = input.index
                         input.index += 3
                         val endIndex1 = input.index
 
-                        output.add(LexerToken.Text(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], "\"\"\""))
+                        output.add(JlText(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], "\"\"\""))
                     } else {
                         val startIndex1 = input.index++
                         val startIndex2 = input.index
@@ -141,7 +141,7 @@ open class JavaLexer {
                         var escaped = false
                         input.skipUntil { index, char ->
                             if (char == '\n') {
-                                output.add(LexerToken.Error(input.text[startIndex1..input.index], "Unterminated string"))
+                                output.add(JlError(input.text[startIndex1..input.index], "Unterminated string"))
                                 false
                             } else if (char == '\\') {
                                 escaped = true
@@ -152,16 +152,16 @@ open class JavaLexer {
                             } else {
                                 char == quote
                             }
-                        } ?: output.add(LexerToken.Error(input.text[startIndex1..input.index], "Unterminated string")).also { break }
+                        } ?: output.add(JlError(input.text[startIndex1..input.index], "Unterminated string")).also { break }
 
                         val endIndex2 = input.index++
                         val endIndex1 = input.index
 
-                        output.add(LexerToken.Text(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], quote.toString()))
+                        output.add(JlText(input.text[startIndex1..endIndex1], input.text[startIndex2..endIndex2], quote.toString()))
                     }
                 }
                 else -> {
-                    output.add(LexerToken.Identifier(input.text[wordStart..wordEnd]))
+                    output.add(JlIdentifier(input.text[wordStart..wordEnd]))
                     fork.merge()
                 }
             }

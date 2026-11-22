@@ -1,6 +1,7 @@
 package net.typho.compilation_util.analyzer.lookup
 
-import net.typho.compilation_util.analyzer.AnalyzeNode
+import net.typho.compilation_util.analyzer.JaImport
+import net.typho.compilation_util.analyzer.JaPath
 import net.typho.compilation_util.index.ClassIndex
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
@@ -15,10 +16,10 @@ import kotlin.io.path.extension
  * [ClassLookup.getForPath] (passing in a source directory or a jar) is sufficient for almost every use case.
  */
 interface ClassLookup {
-    fun resolve(path: AnalyzeNode.Path): ClassIndex?
+    fun resolve(path: JaPath): ClassIndex?
 
     fun interface Supplier {
-        fun create(imports: List<AnalyzeNode.Import>): ClassLookup
+        fun create(imports: List<JaImport>): ClassLookup
     }
 
     open class Jar(
@@ -30,9 +31,9 @@ interface ClassLookup {
          * Map of absolute names to their [ClassIndex].
          */
         @JvmField
-        protected val files = mutableMapOf<AnalyzeNode.Path, ClassIndex?>()
+        protected val files = mutableMapOf<JaPath, ClassIndex?>()
 
-        protected fun getFile(path: AnalyzeNode.Path): ClassIndex? {
+        protected fun getFile(path: JaPath): ClassIndex? {
             if (files.containsKey(path)) {
                 return files[path]
             }
@@ -46,16 +47,16 @@ interface ClassLookup {
             }
         }
 
-        override fun create(imports: List<AnalyzeNode.Import>): ClassLookup = Lookup(imports)
+        override fun create(imports: List<JaImport>): ClassLookup = Lookup(imports)
 
         protected open inner class Lookup(
             @JvmField
-            protected val imports: List<AnalyzeNode.Import>
+            protected val imports: List<JaImport>
         ) : ClassLookup {
             @JvmField
-            protected val cache = mutableMapOf<AnalyzeNode.Path, ClassIndex?>()
+            protected val cache = mutableMapOf<JaPath, ClassIndex?>()
 
-            override fun resolve(path: AnalyzeNode.Path): ClassIndex? {
+            override fun resolve(path: JaPath): ClassIndex? {
                 if (cache.containsKey(path)) {
                     return cache[path]
                 }

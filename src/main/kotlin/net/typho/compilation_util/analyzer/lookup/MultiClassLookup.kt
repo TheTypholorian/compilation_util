@@ -1,17 +1,18 @@
 package net.typho.compilation_util.analyzer.lookup
 
-import net.typho.compilation_util.analyzer.AnalyzeNode
+import net.typho.compilation_util.analyzer.JaImport
+import net.typho.compilation_util.analyzer.JaPath
 
 class MultiClassLookup(
     @JvmField
     val lookups: List<ClassLookup>
 ) : ClassLookup {
-    override fun resolve(path: AnalyzeNode.Path) = lookups.firstNotNullOfOrNull { it.resolve(path) }
+    override fun resolve(path: JaPath) = lookups.firstNotNullOfOrNull { it.resolve(path) }
 
     class Supplier(
         @JvmField
         val lookups: List<ClassLookup.Supplier>
     ) : ClassLookup.Supplier {
-        override fun create(imports: List<AnalyzeNode.Import>) = MultiClassLookup(lookups.map { it.create(imports) })
+        override fun create(imports: List<JaImport>) = MultiClassLookup(lookups.map { it.create(imports) })
     }
 }

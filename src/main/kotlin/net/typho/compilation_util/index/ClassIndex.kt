@@ -1,15 +1,15 @@
 package net.typho.compilation_util.index
 
-import net.typho.compilation_util.analyzer.AnalyzeNode
+import net.typho.compilation_util.analyzer.JaPath
 import org.objectweb.asm.tree.ClassNode
 
 interface ClassIndex {
-    val name: AnalyzeNode.Path
+    val name: JaPath
     val access: Int
     val methods: List<MethodIndex>
 
     class OfNode(
-        override val name: AnalyzeNode.Path,
+        override val name: JaPath,
         @JvmField
         val node: ClassNode
     ): ClassIndex {
