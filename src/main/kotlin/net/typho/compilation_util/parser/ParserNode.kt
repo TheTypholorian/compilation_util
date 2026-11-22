@@ -147,23 +147,60 @@ abstract class ParserNode {
 
     open class Annotation(
         open var type: Path,
-        open val values: MutableList<AnnotationValue>
+        open val values: MutableList<Pair<LexerToken.Identifier?, AnnotationValue<*>>>
     ) : ParserNode() {
         override fun fieldsToString(): String {
-            return "${type.fieldsToString()}(${values.joinToString() { it.fieldsToString() }})"
+            return "${type.fieldsToString()}(${values.joinToString { (key, value) ->
+                if (key == null) {
+                    value.fieldsToString()
+                } else {
+                    "${key.text} = ${value.fieldsToString()}"
+                }
+            }})"
         }
     }
 
-    open class AnnotationValue(
-        open var key: LexerToken.Identifier?,
-        open val body: MutableList<LexerToken>
-    ) : ParserNode() {
+    abstract class AnnotationValue<V>(
+        open val value: V
+    ) : ParserNode()
+
+    open class NumberAnnotationValue(
+        value: LexerToken.Number
+    ) : AnnotationValue<LexerToken.Number>(value) {
         override fun fieldsToString(): String {
-            return if (key == null) {
-                body.joinToString(separator = " ") { it.text }
-            } else {
-                "${key!!.text} = ${body.joinToString(separator = " ") { it.text }}"
-            }
+            return value.text.toString()
+        }
+    }
+
+    open class TextAnnotationValue(
+        value: LexerToken.Text
+    ) : AnnotationValue<LexerToken.Text>(value) {
+        override fun fieldsToString(): String {
+            return value.text.toString()
+        }
+    }
+
+    open class ArrayAnnotationValue(
+        value: /* TODO */ List<AnnotationValue<*>>
+    ) : AnnotationValue<List<AnnotationValue<*>>>(value) {
+        override fun fieldsToString(): String {
+            return value.joinToString { it.fieldsToString() }
+        }
+    }
+
+    open class NestedAnnotationValue(
+        value: Annotation
+    ) : AnnotationValue<Annotation>(value) {
+        override fun fieldsToString(): String {
+            return "@" + value.fieldsToString()
+        }
+    }
+
+    open class UnknownAnnotationValue(
+        value: List<LexerToken>
+    ) : AnnotationValue<List<LexerToken>>(value) {
+        override fun fieldsToString(): String {
+            return value.joinToString(" ") { it.text.toString() }
         }
     }
 

@@ -2,46 +2,13 @@ package net.typho.compilation_util.parser
 
 import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
+import net.typho.compilation_util.lexer.nextUntilOrEndConsideringBrackets
+import net.typho.compilation_util.lexer.readBrackets
 import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
 
 @Suppress("UNCHECKED_CAST")
 object JavaParser {
-    private fun <V> ParsingIterator<V>.readBrackets(open: Char, close: Char, name: String): List<V> {
-        var depth = 1
-        return nextUntil { index, value ->
-            if (value is LexerToken.Punctuation) {
-                when (value.char) {
-                    open -> depth++
-                    close -> depth--
-                }
-            }
-
-            depth == 0
-        } ?: throw DataReadException("Unterminated $name")
-    }
-
-    private fun <V> ParsingIterator<V>.nextUntilOrEndConsideringBrackets(char: Char, name: String): List<V> {
-        var depth = 0
-        return nextUntilOrEnd { index, value ->
-            if (value is LexerToken.Punctuation) {
-                when (value.char) {
-                    '{', '[', '(', '<' -> depth++
-                    '}', ']', ')', '>' -> depth--
-                    char -> if (depth == 0) {
-                        return@nextUntilOrEnd true
-                    }
-                }
-
-                if (depth < 0) {
-                    throw DataReadException("Unterminated $name")
-                }
-            }
-
-            false
-        }
-    }
-
     @JvmStatic
     fun readArgumentListDeclaration(iterator: ParsingIterator<LexerToken>, list: MutableList<ParserNode.Argument> = mutableListOf()): MutableList<ParserNode.Argument> {
         while (iterator.hasNext()) {
@@ -440,6 +407,33 @@ object JavaParser {
     }
 
     @JvmStatic
+    fun readAnnotationValue(value: List<LexerToken>): ParserNode.AnnotationValue<*> {
+        val iterator = ParsingIterator(value)
+        val value = when (val type = iterator.next()) {
+            is LexerToken.Number -> ParserNode.NumberAnnotationValue(type)
+            is LexerToken.Text -> ParserNode.TextAnnotationValue(type)
+            is LexerToken.Punctuation if type.char == '@' -> ParserNode.NestedAnnotationValue(readAnnotation(iterator))
+            is LexerToken.Punctuation if type.char == '{' -> {
+                val body = ParsingIterator(iterator.readBrackets('{', '}', "annotation array contents"))
+                val array = mutableListOf<ParserNode.AnnotationValue<*>>()
+
+                while (body.hasNext()) {
+                    array.add(readAnnotationValue(body.nextUntilOrEndConsideringBrackets(',', "annotation array value")))
+                }
+
+                ParserNode.ArrayAnnotationValue(array)
+            }
+            else -> ParserNode.UnknownAnnotationValue(value)
+        }
+
+        if (iterator.hasNext()) {
+            throw DataReadException()
+        }
+
+        return value
+    }
+
+    @JvmStatic
     fun readAnnotation(iterator: ParsingIterator<LexerToken>): ParserNode.Annotation {
         val type = readType(iterator, readAnnotations = false, readTypeArguments = false)
         val anno = ParserNode.Annotation(type.path, mutableListOf())
@@ -456,7 +450,7 @@ object JavaParser {
                 value = value.subList(2, value.size)
             }
 
-            anno.values.add(ParserNode.AnnotationValue(key, value.toMutableList()))
+            anno.values.add(key to readAnnotationValue(value))
         }
 
         return anno

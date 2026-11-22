@@ -4,6 +4,8 @@ import net.typho.asm_util.AccessUtil.toAccessString
 import net.typho.compilation_util.analyzer.lookup.ClassLookup
 import net.typho.compilation_util.lexer.Keyword
 import net.typho.compilation_util.lexer.LexerToken
+import net.typho.compilation_util.lexer.nextUntilOrEndConsideringBrackets
+import net.typho.compilation_util.lexer.readBrackets
 import net.typho.compilation_util.parser.ParserNode
 import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
@@ -60,18 +62,18 @@ object JavaAnalyzer {
 
         for (anno in cls.annotations) {
             val type = lookup.resolve(analyzePath(anno.type))!!
-            println("- Annotation with type '${type.name}' access '${type.access.toAccessString()}'")
+            println("Annotation with type '${type.name}' access '${type.access.toAccessString()}'")
 
-            fun readAnnoValue(key: String, value: List<LexerToken>) {
+            fun readAnnoValue(key: String, value: ParserNode.AnnotationValue<*>) {
                 val method = type.methods.first { it.name == key && it.arguments.isEmpty() }
-                val type = method.returnType
+                println("Expected '${method.returnType}' got $value")
             }
 
             if (anno.values.size == 1) {
-                val value = anno.values.single()
-                readAnnoValue(value.key?.text?.toString() ?: "value", value.body)
+                val (key, body) = anno.values.single()
+                readAnnoValue(key?.text?.toString() ?: "value", body)
             } else {
-                anno.values.forEach { value -> readAnnoValue((value.key ?: throw DataReadException()).text.toString(), value.body) }
+                anno.values.forEach { (key, body) -> readAnnoValue((key ?: throw DataReadException()).text.toString(), body) }
             }
         }
     }
