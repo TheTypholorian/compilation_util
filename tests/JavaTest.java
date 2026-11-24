@@ -666,6 +666,7 @@ public class JavaTest<T extends Number & Comparable<T>>
         }
     }
 
+    /*
     public sealed interface Shape
             permits Circle, Rectangle, Polygon {
 
@@ -723,6 +724,7 @@ public class JavaTest<T extends Number & Comparable<T>>
             return super.area() / 2.0;
         }
     }
+     */
 
     /*
     public record Point(int x, int y)
@@ -794,6 +796,7 @@ public class JavaTest<T extends Number & Comparable<T>>
         }
     }
 
+    /*
     public interface Processor<I, O> {
 
         O process(I input);
@@ -808,4 +811,5 @@ public class JavaTest<T extends Number & Comparable<T>>
             return input -> input;
         }
     }
+     */
 }
