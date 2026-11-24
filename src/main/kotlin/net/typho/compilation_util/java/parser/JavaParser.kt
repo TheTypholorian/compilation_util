@@ -639,7 +639,7 @@ open class JavaParser {
         }
 
         return JpConstructor(
-            validateMethodAccess(access),
+            validateConstructorAccess(access),
             annotations,
             arguments,
             exceptions,
@@ -681,6 +681,7 @@ open class JavaParser {
 
     open fun tryReadAttribute(iterator: ParsingIterator<JlToken>, parent: JpClass?): JpAttribute? {
         // sorted most likely first
+        // TODO what if more than one type here works?
         var fork = iterator.fork()
         tryReadMethod(fork, parent)?.let {
             fork.merge()
