@@ -163,14 +163,7 @@ open class JavaParser {
     }
 
     open fun readAccess(iterator: ParsingIterator<JlToken>): Int {
-        var access = 0
-
-        val accessMask = readAccessMask(iterator)
-
-        if (accessMask != 0) {
-            access = accessMask
-            iterator.next()
-        }
+        var access = readAccessMask(iterator)
 
         while (true) {
             val modifierMask = readModifierMask(iterator)
@@ -185,7 +178,7 @@ open class JavaParser {
                 throw DataReadException("Duplicate modifier ${modifierMask.toExtraAccessString()}")
             }
 
-            iterator.next()
+            access = newAccess
         }
 
         return access
@@ -524,14 +517,15 @@ open class JavaParser {
             "enum" -> tryReadEnumClass(iterator, access or Opcodes.ACC_ENUM, annotations, parent)
             "interface" -> tryReadInterfaceClass(iterator, access or Opcodes.ACC_INTERFACE, annotations, parent)
             "record" -> tryReadRecordClass(iterator, access or Opcodes.ACC_RECORD, annotations, parent)
-            else -> null
+            else -> throw DataReadException("Unknown class type ${type.text}")
         }
     }
 
     open fun tryReadClass(iterator: ParsingIterator<JlToken>, parent: JpClass?): JpClass? {
         val annotations = readAnnotations(iterator)
         val access = readAccess(iterator)
-        return tryReadClass(iterator, access, annotations, iterator.next(), parent)
+        val type = iterator.next()
+        return tryReadClass(iterator, access, annotations, type, parent)
     }
 
     open fun tryReadMethod(iterator: ParsingIterator<JlToken>, parent: JpClass?): JpMethod? {
@@ -548,6 +542,12 @@ open class JavaParser {
 
         val returnType = readType(iterator, readAnnotations = true, readTypeArguments = true)
         val name = iterator.next() as? JlIdentifier ?: return null
+
+        val open = iterator.next()
+
+        if (!(open is JlPunctuation && open.char == '(')) {
+            return null
+        }
 
         val arguments = readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list")))
 
@@ -600,6 +600,12 @@ open class JavaParser {
             if (name.text.toString() != it.name.text.toString()) {
                 return null
             }
+        }
+
+        val open = iterator.next()
+
+        if (!(open is JlPunctuation && open.char == '(')) {
+            return null
         }
 
         val arguments = readArgumentListDeclaration(ParsingIterator(iterator.readBrackets('(', ')', "argument list")))
@@ -749,7 +755,7 @@ open class JavaParser {
         val file = JpFile(pkg, imports, mutableListOf())
 
         while (iterator.hasNext()) {
-            file.classes.add(tryReadClass(iterator, null) ?: TODO())
+            file.classes.add(tryReadClass(iterator, null) ?: throw DataReadException(iterator.peek().toString()))
         }
 
         return file

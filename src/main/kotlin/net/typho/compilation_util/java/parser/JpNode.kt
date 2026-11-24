@@ -18,6 +18,10 @@ abstract class JpNode {
 
             if (this@JpNode is JpAttribute) {
                 append(access.toExtraAccessString())
+
+                if (access != 0) {
+                    append(' ')
+                }
             }
 
             append(this@JpNode.javaClass.simpleName)
