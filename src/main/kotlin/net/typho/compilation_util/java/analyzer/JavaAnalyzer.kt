@@ -1,6 +1,5 @@
 package net.typho.compilation_util.java.analyzer
 
-import net.typho.asm_util.AccessUtil.toAccessString
 import net.typho.compilation_util.java.ExtraOpcodes.toExtraAccessString
 import net.typho.compilation_util.java.JPath
 import net.typho.compilation_util.java.analyzer.lookup.ClassLookup
@@ -10,7 +9,6 @@ import net.typho.compilation_util.java.parser.JpFile
 import net.typho.compilation_util.java.plus
 import net.typho.parsing_util.ParsingIterator
 import net.typho.parsing_util.error.DataReadException
-import kotlin.collections.map
 
 object JavaAnalyzer {
     @JvmStatic

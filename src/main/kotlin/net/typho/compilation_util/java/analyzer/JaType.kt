@@ -1,6 +1,7 @@
 package net.typho.compilation_util.java.analyzer
 
 import net.typho.compilation_util.java.JPath
+import net.typho.compilation_util.java.analyzer.lookup.ClassLookup
 import org.objectweb.asm.Type
 
 data class JaType(
@@ -11,12 +12,6 @@ data class JaType(
     @JvmField
     val arguments: MutableList<JaTypeArgumentValue>
 ) : JaNode() {
-    init {
-        if (path.path.endsWith("[]")) {
-            throw IllegalArgumentException("Created an array JaType incorrectly, use JaType.arrayOf()")
-        }
-    }
-
     companion object {
         @JvmField
         val ARRAY = JPath($$"$ARRAY")
@@ -31,7 +26,7 @@ data class JaType(
 
             component
         } else {
-            JaType(JPath(type.className /* TODO primitives? kotlin? */), arguments)
+            JaType(JPath(type /* TODO primitives? kotlin? */), arguments)
         }
 
         @JvmStatic
@@ -39,6 +34,18 @@ data class JaType(
             component: JaType,
             //arrayAnnotations: MutableList<JaAnnotation>
         ) = JaType(/* arrayAnnotations */ ARRAY, mutableListOf(JaTypeArgumentValue(component, null)))
+    }
+
+    fun canBeUsedAs(other: JaType, lookup: ClassLookup): Boolean {
+        if (this == other) {
+            return true
+        }
+
+        if (!path.isSubclassOf(other.path, lookup)!!) {
+            return false
+        }
+
+        TODO()
     }
 
     override fun toString(): String {

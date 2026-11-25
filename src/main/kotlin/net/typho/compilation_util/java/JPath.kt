@@ -1,6 +1,6 @@
 package net.typho.compilation_util.java
 
-import net.typho.compilation_util.java.analyzer.JaNode
+import net.typho.compilation_util.java.analyzer.lookup.ClassLookup
 import net.typho.parsing_util.error.DataReadException
 import org.objectweb.asm.Type
 
@@ -45,6 +45,19 @@ data class JPath(
     constructor(tokens: List<CharSequence>) : this(if (tokens.isEmpty()) throw DataReadException("Empty path") else tokens.joinToString("."))
 
     constructor(type: Type) : this(type.className.replace('/', '.'))
+
+    init {
+        if (path.endsWith("[]")) {
+            throw IllegalArgumentException("Created an array JPath, use JaType.arrayOf() instead")
+        }
+    }
+
+    fun isSubclassOf(parent: JPath, lookup: ClassLookup): Boolean? {
+        var child = lookup.resolve(this) ?: return null
+        val parent = lookup.resolve(parent) ?: return null
+
+        TODO()
+    }
 
     operator fun plus(other: JPath) = JPath("$path.$other")
 
