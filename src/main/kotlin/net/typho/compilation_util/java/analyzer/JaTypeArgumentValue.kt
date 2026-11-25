@@ -7,4 +7,10 @@ data class JaTypeArgumentValue(
     val type: JaType,
     @JvmField
     val relativity: TypeArgumentRelativity?
-) : JaNode()
+) : JaNode() {
+    override fun toString(): String {
+        return relativity?.let { relativity ->
+            "? ${relativity.name.lowercase()} $type"
+        } ?: type.toString()
+    }
+}

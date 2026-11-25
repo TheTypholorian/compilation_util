@@ -1,6 +1,6 @@
 package net.typho.compilation_util.java.index
 
-import net.typho.compilation_util.java.JPath
+import net.typho.compilation_util.java.analyzer.JaType
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.MethodNode
 
@@ -8,7 +8,7 @@ interface MethodIndex {
     val name: String
     val access: Int
     val arguments: List<MethodArgumentIndex>
-    val returnType: JPath
+    val returnType: JaType
 
     class OfNode(
         @JvmField
@@ -18,7 +18,7 @@ interface MethodIndex {
             get() = node.name
         override val access: Int
             get() = node.access
-        override val arguments = Type.getArgumentTypes(node.desc).map { MethodArgumentIndex.Impl(JPath(it)) }
-        override val returnType = JPath(Type.getReturnType(node.desc))
+        override val arguments = Type.getArgumentTypes(node.desc).map { MethodArgumentIndex.Impl(JaType.of(it, mutableListOf())) }
+        override val returnType = JaType.of(Type.getReturnType(node.desc), mutableListOf())
     }
 }
